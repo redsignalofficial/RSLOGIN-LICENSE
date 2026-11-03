@@ -306,10 +306,10 @@ function loadLicenses() {
       status: 'ACTIVE',
       ip_lock: false,
       bound_ip: null,
-      max_servers: 10,
+      max_servers: null, // Unlimited servers
       created_at: new Date().toISOString(),
       expires_at: null,
-      note: 'Default master key for testing',
+      note: 'Default master key (Unlimited servers)',
       servers: {}
     };
     saveLicenses(licenses);
@@ -502,10 +502,10 @@ app.post('/api/license/validate', validateLimiter, (req, res) => {
     }
   }
 
-  // 5. Server Count Limit check
+  // 5. Server Count Limit check (null or 0 = unlimited)
   if (!license.servers) license.servers = {};
   const existingServers = Object.keys(license.servers);
-  if (license.max_servers && !license.servers[serverId] && existingServers.length >= license.max_servers) {
+  if (typeof license.max_servers === 'number' && license.max_servers > 0 && !license.servers[serverId] && existingServers.length >= license.max_servers) {
     pushConsole('WARN', 'LICENSE', `⚠️ Server limit exceeded for ${license.key}: ${existingServers.length}/${license.max_servers}`);
     logValidation({ key: effectiveKey, valid: false, reason: `Max server limit reached (${existingServers.length}/${license.max_servers})`, ip: clientIp, product });
     return res.status(200).json({
@@ -982,12 +982,18 @@ app.post('/api/admin/licenses', requireAdmin, (req, res) => {
     return res.status(409).json({ error: 'License key already exists' });
   }
 
+  let cleanMaxServers = null;
+  if (max_servers !== undefined && max_servers !== null && max_servers !== '' && max_servers !== 0 && max_servers !== '0') {
+    const num = parseInt(max_servers, 10);
+    cleanMaxServers = (num > 0) ? num : null;
+  }
+
   licenses[cleanKey] = {
     key: cleanKey,
     owner: String(owner || 'Customer').trim().slice(0, 100),
     tier: String(tier || 'STANDARD').trim().toUpperCase().slice(0, 30),
     status: 'ACTIVE',
-    max_servers: Math.max(1, Math.min(100, Number(max_servers) || 3)),
+    max_servers: cleanMaxServers,
     ip_lock: Boolean(ip_lock),
     bound_ip: bound_ip ? String(bound_ip).trim().slice(0, 60) : null,
     created_at: new Date().toISOString(),
@@ -1036,7 +1042,14 @@ function handleUpdateLicense(req, res) {
   if (status) licenses[targetKey].status = status;
   if (owner !== undefined) licenses[targetKey].owner = String(owner || '').trim().slice(0, 100);
   if (tier !== undefined) licenses[targetKey].tier = String(tier || 'STANDARD').trim().toUpperCase().slice(0, 30);
-  if (max_servers !== undefined) licenses[targetKey].max_servers = Math.max(1, Math.min(100, Number(max_servers) || 3));
+  if (max_servers !== undefined) {
+    if (max_servers === null || max_servers === 0 || max_servers === '0' || max_servers === '' || String(max_servers).toLowerCase() === 'unlimited') {
+      licenses[targetKey].max_servers = null; // Unlimited
+    } else {
+      const num = parseInt(max_servers, 10);
+      licenses[targetKey].max_servers = (num > 0) ? num : null;
+    }
+  }
   if (ip_lock !== undefined) licenses[targetKey].ip_lock = Boolean(ip_lock);
   if (bound_ip !== undefined) licenses[targetKey].bound_ip = bound_ip ? String(bound_ip).trim().slice(0, 60) : null;
   if (expires_at !== undefined) licenses[targetKey].expires_at = expires_at ? new Date(expires_at).toISOString() : null;

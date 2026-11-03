@@ -578,8 +578,8 @@
             </select>
           </div>
           <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Max Servers Allowed</label>
-            <input id="create-max-servers" type="number" min="1" max="100" value="3"
+            <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Max Servers (0 = Unlimited)</label>
+            <input id="create-max-servers" type="number" min="0" value="0" placeholder="0 for Unlimited"
               class="w-full bg-[#1F1F1F] border border-[#272727] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand font-mono">
           </div>
         </div>
@@ -649,8 +649,8 @@
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Max Servers Allowed</label>
-            <input id="edit-max-servers" type="number" min="1" max="100" value="3"
+            <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Max Servers (0 = Unlimited)</label>
+            <input id="edit-max-servers" type="number" min="0" value="0" placeholder="0 for Unlimited"
               class="w-full bg-[#1F1F1F] border border-[#272727] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand font-mono">
           </div>
           <div>
@@ -1026,7 +1026,7 @@
 
       tbody.innerHTML = licenses.map(lic => {
         const serverCount = lic.servers ? Object.keys(lic.servers).length : 0;
-        const maxServers = lic.max_servers || 3;
+        const maxServers = (lic.max_servers && lic.max_servers > 0) ? lic.max_servers : '∞';
         const statusBadge = lic.status === 'ACTIVE'
           ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">ACTIVE</span>'
           : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono">SUSPENDED</span>';
@@ -1494,7 +1494,8 @@
       const owner = document.getElementById('create-owner').value.trim();
       const customKey = document.getElementById('create-key').value.trim();
       const tier = document.getElementById('create-tier').value;
-      const max_servers = parseInt(document.getElementById('create-max-servers').value) || 3;
+      const maxInput = document.getElementById('create-max-servers').value.trim();
+      const max_servers = (maxInput && parseInt(maxInput, 10) > 0) ? parseInt(maxInput, 10) : 0;
       const ip_lock = document.getElementById('create-ip-lock').checked;
 
       try {
@@ -1534,7 +1535,7 @@
       document.getElementById('edit-owner').value = lic.owner || '';
       document.getElementById('edit-status').value = lic.status || 'ACTIVE';
       document.getElementById('edit-tier').value = lic.tier || 'STANDARD';
-      document.getElementById('edit-max-servers').value = lic.max_servers || 3;
+      document.getElementById('edit-max-servers').value = (lic.max_servers && lic.max_servers > 0) ? lic.max_servers : 0;
       document.getElementById('edit-bound-ip').value = lic.bound_ip || '';
       document.getElementById('edit-note').value = lic.note || '';
       document.getElementById('edit-ip-lock').checked = Boolean(lic.ip_lock);
@@ -1553,7 +1554,8 @@
       const owner = document.getElementById('edit-owner').value.trim();
       const status = document.getElementById('edit-status').value;
       const tier = document.getElementById('edit-tier').value;
-      const max_servers = parseInt(document.getElementById('edit-max-servers').value, 10) || 3;
+      const maxInput = document.getElementById('edit-max-servers').value.trim();
+      const max_servers = (maxInput && parseInt(maxInput, 10) > 0) ? parseInt(maxInput, 10) : 0;
       const bound_ip = document.getElementById('edit-bound-ip').value.trim() || null;
       const note = document.getElementById('edit-note').value.trim();
       const ip_lock = document.getElementById('edit-ip-lock').checked;
