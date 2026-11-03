@@ -19,7 +19,32 @@ const LOGS_FILE = path.join(__dirname, 'data', 'logs.json');
 const BANNED_IPS_FILE = path.join(__dirname, 'data', 'banned_ips.json');
 
 app.use(cors());
-app.use(express.json());
+
+// Robust JSON body parser that handles unescaped control characters in string literals (e.g. Minecraft MOTD newlines/tabs)
+app.use(express.text({ type: ['application/json', 'text/*', '*/*'], limit: '2mb' }));
+app.use((req, res, next) => {
+  if (typeof req.body === 'string' && req.body.trim().length > 0) {
+    try {
+      req.body = JSON.parse(req.body);
+    } catch (e) {
+      try {
+        const sanitized = req.body.replace(/[\x00-\x1f]/g, (c) => {
+          if (c === '\n') return '\\n';
+          if (c === '\r') return '\\r';
+          if (c === '\t') return '\\t';
+          return '';
+        });
+        req.body = JSON.parse(sanitized);
+      } catch (err2) {
+        req.body = {};
+      }
+    }
+  } else if (!req.body || typeof req.body !== 'object') {
+    req.body = {};
+  }
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Ensure data folder and files exist
