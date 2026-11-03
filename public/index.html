@@ -673,8 +673,9 @@
   </div>
 
   <script>
-    // ---------------------- Application State ----------------------
-    let token = localStorage.getItem('rslogin_admin_token') || '';
+    // ---------------------- Application State & Security ----------------------
+    // Use sessionStorage so the admin session token is never permanently stored on disk
+    let token = sessionStorage.getItem('rslogin_admin_token') || localStorage.getItem('rslogin_admin_token') || '';
     let globalLicenses = [];
     let globalLogs = [];
     let globalBannedIps = [];
@@ -682,11 +683,38 @@
     let sseSource = null;
     let commandHistory = [];
     let historyIndex = -1;
+    let lastActivityTime = Date.now();
 
-    // Initialize View
-    window.addEventListener('DOMContentLoaded', () => {
+    // Inactivity timeout: auto-lock after 30 minutes of inactivity
+    const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
+    ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(evt => {
+      window.addEventListener(evt, () => { lastActivityTime = Date.now(); }, { passive: true });
+    });
+
+    setInterval(() => {
+      if (token && (Date.now() - lastActivityTime > INACTIVITY_TIMEOUT_MS)) {
+        handleLogout(true, 'Session timed out due to 30 minutes of inactivity.');
+      }
+    }, 60 * 1000);
+
+    // Initialize View with server verification
+    window.addEventListener('DOMContentLoaded', async () => {
       if (token) {
-        showDashboard();
+        try {
+          const res = await fetch('/api/admin/verify', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (res.ok) {
+            // Migrate token to sessionStorage and cleanse localStorage
+            sessionStorage.setItem('rslogin_admin_token', token);
+            localStorage.removeItem('rslogin_admin_token');
+            showDashboard();
+            return;
+          }
+        } catch (e) {
+          // Fall through to showLogin if verify fails
+        }
+        handleLogout(false);
       } else {
         showLogin();
       }
@@ -716,7 +744,7 @@
       }, 3000);
     }
 
-    // ---------------------- Authentication ----------------------
+    // ---------------------- Authentication & Brute Force Defense ----------------------
     function togglePasswordVisibility(id) {
       const input = document.getElementById(id);
       const icon = document.getElementById('admin-pass-icon');
@@ -740,17 +768,27 @@
       btn.innerHTML = '<i class="ph-bold ph-arrows-clockwise animate-spin text-sm"></i> Authenticating...';
 
       try {
-        const res = await fetch('/api/admin/licenses', {
-          headers: { 'Authorization': `Bearer ${pass}` }
+        const res = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pass })
         });
+        const data = await res.json().catch(() => ({}));
 
-        if (res.ok) {
-          token = pass;
-          localStorage.setItem('rslogin_admin_token', token);
+        if (res.ok && data.token) {
+          token = data.token;
+          sessionStorage.setItem('rslogin_admin_token', token);
+          localStorage.removeItem('rslogin_admin_token'); // Purge legacy plaintext password
+          document.getElementById('admin-pass').value = '';
+          lastActivityTime = Date.now();
           showDashboard();
-          showToast('Welcome back, Administrator!');
+          showToast('Authenticated securely via encrypted session token.');
+        } else if (res.status === 429) {
+          errEl.innerText = data.error || 'Too many failed attempts. You are temporarily locked out.';
+          errEl.classList.remove('hidden');
         } else {
-          errEl.innerText = 'Invalid Admin Secret password.';
+          const attemptsNotice = (data.attemptsLeft !== undefined) ? ` (${data.attemptsLeft} attempt(s) remaining)` : '';
+          errEl.innerText = (data.error || 'Invalid Admin Secret password.') + attemptsNotice;
           errEl.classList.remove('hidden');
         }
       } catch (err) {
@@ -764,8 +802,17 @@
 
     let autoRefreshInterval = null;
 
-    function handleLogout() {
+    async function handleLogout(notify = true, customMessage = '') {
+      if (token) {
+        try {
+          fetch('/api/admin/logout', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+          }).catch(() => {});
+        } catch (e) {}
+      }
       token = '';
+      sessionStorage.removeItem('rslogin_admin_token');
       localStorage.removeItem('rslogin_admin_token');
       if (sseSource) {
         sseSource.close();
@@ -776,7 +823,9 @@
         autoRefreshInterval = null;
       }
       showLogin();
-      showToast('Logged out.');
+      if (notify) {
+        showToast(customMessage || 'Logged out securely.');
+      }
     }
 
     function showLogin() {
@@ -1605,6 +1654,10 @@
 
     function escapeHtml(str) {
       return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+
+    function escapeAttr(str) {
+      return (str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
     }
   </script>
 </body>

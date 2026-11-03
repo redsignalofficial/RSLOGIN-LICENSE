@@ -18,10 +18,35 @@ const DATA_FILE = path.join(__dirname, 'data', 'licenses.json');
 const LOGS_FILE = path.join(__dirname, 'data', 'logs.json');
 const BANNED_IPS_FILE = path.join(__dirname, 'data', 'banned_ips.json');
 
+// ---------------------- HTTP Security & Server Hardening ----------------------
+app.disable('x-powered-by');
+
+// Standard OWASP HTTP Security Headers
+app.use((req, res, next) => {
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  res.setHeader('Content-Security-Policy', [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://unpkg.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com data:",
+    "img-src 'self' data: https:",
+    "connect-src 'self' https: wss:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "frame-ancestors 'none'"
+  ].join('; '));
+  next();
+});
+
 app.use(cors());
 
 // Robust JSON body parser that handles unescaped control characters in string literals (e.g. Minecraft MOTD newlines/tabs)
-app.use(express.text({ type: ['application/json', 'text/*', '*/*'], limit: '2mb' }));
+app.use(express.text({ type: ['application/json', 'text/*', '*/*'], limit: '512kb' }));
 app.use((req, res, next) => {
   if (typeof req.body === 'string' && req.body.trim().length > 0) {
     try {
@@ -46,6 +71,166 @@ app.use((req, res, next) => {
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ---------------------- Security Helpers & Cryptographic Guards ----------------------
+
+function getClientIp(req) {
+  return req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress || '127.0.0.1';
+}
+
+function timingSafeMatch(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const bufA = Buffer.from(a, 'utf8');
+  const bufB = Buffer.from(b, 'utf8');
+  if (bufA.length !== bufB.length) {
+    crypto.timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+function isValidApiKey(provided) {
+  if (!provided || typeof provided !== 'string') return false;
+  if (timingSafeMatch(provided, ADMIN_SECRET)) return true;
+  for (const k of CLIENT_API_KEYS) {
+    if (timingSafeMatch(provided, k)) return true;
+  }
+  return false;
+}
+
+// ---------------------- Brute-Force Defense & IP Lockout ----------------------
+const failedLogins = new Map(); // ip -> { count, lockedUntil, firstFailed }
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_MS = 15 * 60 * 1000; // 15-minute lockout
+const ATTEMPT_WINDOW_MS = 10 * 60 * 1000; // 10-minute sliding window
+
+function checkLoginLockout(ip) {
+  const record = failedLogins.get(ip);
+  if (!record) return { locked: false };
+  const now = Date.now();
+  if (record.lockedUntil && now < record.lockedUntil) {
+    const remainingSec = Math.ceil((record.lockedUntil - now) / 1000);
+    return { locked: true, remainingSec };
+  }
+  if (now - record.firstFailed > ATTEMPT_WINDOW_MS) {
+    failedLogins.delete(ip);
+    return { locked: false };
+  }
+  return { locked: false, attempts: record.count };
+}
+
+function recordFailedLogin(ip) {
+  const now = Date.now();
+  const record = failedLogins.get(ip) || { count: 0, firstFailed: now, lockedUntil: null };
+  if (now - record.firstFailed > ATTEMPT_WINDOW_MS) {
+    record.count = 1;
+    record.firstFailed = now;
+    record.lockedUntil = null;
+  } else {
+    record.count++;
+  }
+  if (record.count >= MAX_FAILED_ATTEMPTS) {
+    record.lockedUntil = now + LOCKOUT_MS;
+    pushConsole('WARN', 'SECURITY', `🔒 IP ${ip} locked out for 15 minutes after ${record.count} failed authentication attempts.`);
+  }
+  failedLogins.set(ip, record);
+}
+
+function clearFailedLogin(ip) {
+  failedLogins.delete(ip);
+}
+
+// ---------------------- Cryptographic Admin Session Tokens ----------------------
+
+function createAdminSessionToken(clientIp) {
+  const payload = {
+    sub: 'admin',
+    ip: clientIp,
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + (12 * 3600), // 12-hour session
+    nonce: crypto.randomBytes(8).toString('hex')
+  };
+  const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const signature = crypto.createHmac('sha256', SECRET_SIGN_KEY).update(encodedPayload).digest('base64url');
+  return `RS-SESSION.${encodedPayload}.${signature}`;
+}
+
+function verifyAdminSessionToken(token, clientIp) {
+  if (!token || typeof token !== 'string' || !token.startsWith('RS-SESSION.')) return null;
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  const [, encodedPayload, providedSig] = parts;
+
+  const expectedSig = crypto.createHmac('sha256', SECRET_SIGN_KEY).update(encodedPayload).digest('base64url');
+  if (!timingSafeMatch(providedSig, expectedSig)) return null;
+
+  try {
+    const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'));
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp && now > payload.exp) return null;
+    return payload;
+  } catch (e) {
+    return null;
+  }
+}
+
+// ---------------------- Sliding Window Rate Limiting ----------------------
+const rateLimitMap = new Map();
+
+function createRateLimiter({ windowMs, maxRequests, message }) {
+  return (req, res, next) => {
+    const ip = getClientIp(req);
+    const key = `${ip}:${req.baseUrl || req.path}`;
+    const now = Date.now();
+    let record = rateLimitMap.get(key);
+
+    if (!record || now > record.resetTime) {
+      record = { count: 1, resetTime: now + windowMs };
+      rateLimitMap.set(key, record);
+    } else {
+      record.count++;
+    }
+
+    const remaining = Math.max(0, maxRequests - record.count);
+    const resetSec = Math.ceil((record.resetTime - now) / 1000);
+
+    res.setHeader('X-RateLimit-Limit', maxRequests);
+    res.setHeader('X-RateLimit-Remaining', remaining);
+    res.setHeader('X-RateLimit-Reset', resetSec);
+
+    if (record.count > maxRequests) {
+      pushConsole('WARN', 'SECURITY', `⚠️ Rate limit exceeded by ${ip} on ${req.originalUrl}`);
+      return res.status(429).json({
+        error: message || 'Too many requests. Please slow down.',
+        retryAfter: resetSec
+      });
+    }
+    next();
+  };
+}
+
+// Global rate limiters
+const validateLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  maxRequests: 120,
+  message: 'Validation rate limit exceeded. Please wait.'
+});
+
+const adminLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  maxRequests: 60,
+  message: 'Admin API rate limit exceeded.'
+});
+
+// Periodic rate limiter memory cleanup every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, record] of rateLimitMap.entries()) {
+    if (now > record.resetTime) {
+      rateLimitMap.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
 
 // Ensure data folder and files exist
 if (!fs.existsSync(path.join(__dirname, 'data'))) {
@@ -201,7 +386,7 @@ app.get('/health', (req, res) => {
 
 // ---------------------- License Validation Endpoint ----------------------
 // Called by Minecraft Paper/Velocity plugins
-app.post('/api/license/validate', (req, res) => {
+app.post('/api/license/validate', validateLimiter, (req, res) => {
   const {
     license_key,
     api_key,
@@ -230,9 +415,9 @@ app.post('/api/license/validate', (req, res) => {
     });
   }
 
-  // 2. API Key authentication check
+  // 2. API Key authentication check (constant-time verification)
   const providedApiKey = req.headers['x-api-key'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '').trim() || api_key;
-  if (!CLIENT_API_KEYS.has(providedApiKey) && providedApiKey !== ADMIN_SECRET) {
+  if (!isValidApiKey(providedApiKey)) {
     pushConsole('WARN', 'SECURITY', `⚠️ Unauthorized API key attempt from ${clientIp} (Product: ${product || 'unknown'})`);
     logValidation({ key: license_key || 'UNKNOWN', valid: false, reason: 'Invalid or missing API key', ip: clientIp, product });
     return res.status(401).json({
@@ -372,7 +557,9 @@ app.post('/api/license/validate', (req, res) => {
   });
 });
 
-// ---------------------- Admin Authentication Middleware ----------------------
+// ---------------------- Admin Authentication & Rate Limiting ----------------------
+app.use('/api/admin', adminLimiter);
+
 function requireAdmin(req, res, next) {
   const authHeader = req.headers['authorization'];
   if (!authHeader) {
@@ -380,11 +567,85 @@ function requireAdmin(req, res, next) {
   }
 
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-  if (token !== ADMIN_SECRET) {
-    return res.status(403).json({ error: 'Invalid admin secret' });
+  const clientIp = getClientIp(req);
+
+  // Check brute force lockout
+  const lockout = checkLoginLockout(clientIp);
+  if (lockout.locked) {
+    return res.status(429).json({
+      error: `Too many failed attempts. Locked out for ${Math.ceil(lockout.remainingSec / 60)} more minute(s).`,
+      retryAfter: lockout.remainingSec
+    });
   }
-  next();
+
+  // 1. Direct ADMIN_SECRET match (timing-safe)
+  if (timingSafeMatch(token, ADMIN_SECRET)) {
+    clearFailedLogin(clientIp);
+    return next();
+  }
+
+  // 2. Cryptographic session token verification
+  const session = verifyAdminSessionToken(token, clientIp);
+  if (session) {
+    req.adminSession = session;
+    clearFailedLogin(clientIp);
+    return next();
+  }
+
+  // Invalid token -> record failed attempt
+  recordFailedLogin(clientIp);
+  pushConsole('WARN', 'SECURITY', `🚫 Unauthorized admin attempt from ${clientIp}`);
+  return res.status(403).json({ error: 'Invalid admin credentials' });
 }
+
+// Dedicated secure login endpoint (with brute force defense)
+app.post('/api/admin/login', (req, res) => {
+  const clientIp = getClientIp(req);
+  const lockout = checkLoginLockout(clientIp);
+  if (lockout.locked) {
+    return res.status(429).json({
+      error: `Too many failed attempts. IP locked out for ${Math.ceil(lockout.remainingSec / 60)} more minute(s).`,
+      retryAfter: lockout.remainingSec
+    });
+  }
+
+  const { password } = req.body || {};
+  if (!password || !timingSafeMatch(password, ADMIN_SECRET)) {
+    recordFailedLogin(clientIp);
+    const updatedLockout = checkLoginLockout(clientIp);
+    if (updatedLockout.locked) {
+      return res.status(429).json({
+        error: 'Maximum attempts reached. Locked out for 15 minutes.',
+        retryAfter: updatedLockout.remainingSec
+      });
+    }
+    return res.status(403).json({
+      error: 'Invalid admin secret password',
+      attemptsLeft: Math.max(0, MAX_FAILED_ATTEMPTS - (updatedLockout.attempts || 1))
+    });
+  }
+
+  clearFailedLogin(clientIp);
+  const sessionToken = createAdminSessionToken(clientIp);
+  pushConsole('SUCCESS', 'ADMIN', `🔑 Administrator authenticated from ${clientIp}`);
+  res.json({
+    success: true,
+    token: sessionToken,
+    expires_in: 12 * 3600,
+    role: 'admin'
+  });
+});
+
+// Verify current session token or secret
+app.get('/api/admin/verify', requireAdmin, (req, res) => {
+  res.json({ valid: true, role: 'admin' });
+});
+
+// Logout endpoint
+app.post('/api/admin/logout', requireAdmin, (req, res) => {
+  pushConsole('INFO', 'ADMIN', `🚪 Administrator logged out from ${getClientIp(req)}`);
+  res.json({ success: true, message: 'Logged out successfully' });
+});
 
 // ---------------------- Interactive Console & Terminal CLI ----------------------
 
@@ -646,7 +907,11 @@ app.get('/api/admin/console/logs', requireAdmin, (req, res) => {
 // Real-time Server-Sent Events stream for Console Viewer
 app.get('/api/admin/console/stream', (req, res) => {
   const token = req.query.token || req.headers['authorization']?.replace(/^Bearer\s+/i, '').trim();
-  if (token !== ADMIN_SECRET) {
+  const clientIp = getClientIp(req);
+  const isDirect = timingSafeMatch(token, ADMIN_SECRET);
+  const isSession = verifyAdminSessionToken(token, clientIp);
+
+  if (!isDirect && !isSession) {
     return res.status(401).send('Unauthorized to stream console');
   }
 
@@ -706,36 +971,37 @@ app.get('/api/admin/licenses', requireAdmin, (req, res) => {
 
 // Create custom license
 app.post('/api/admin/licenses', requireAdmin, (req, res) => {
-  const { key, owner = 'Customer', tier = 'STANDARD', max_servers = 3, ip_lock = false, bound_ip = null, expires_at = null, note = '' } = req.body;
-  if (!key) {
-    return res.status(400).json({ error: 'key is required' });
+  let { key, owner = 'Customer', tier = 'STANDARD', max_servers = 3, ip_lock = false, bound_ip = null, expires_at = null, note = '' } = req.body || {};
+  if (!key || typeof key !== 'string' || !/^[A-Za-z0-9\-_]{3,64}$/.test(key.trim())) {
+    return res.status(400).json({ error: 'License key must be 3-64 alphanumeric characters, dashes, or underscores' });
   }
 
+  const cleanKey = key.trim();
   const licenses = loadLicenses();
-  if (licenses[key]) {
+  if (licenses[cleanKey]) {
     return res.status(409).json({ error: 'License key already exists' });
   }
 
-  licenses[key] = {
-    key: key.trim(),
-    owner,
-    tier,
+  licenses[cleanKey] = {
+    key: cleanKey,
+    owner: String(owner || 'Customer').trim().slice(0, 100),
+    tier: String(tier || 'STANDARD').trim().toUpperCase().slice(0, 30),
     status: 'ACTIVE',
-    max_servers: Number(max_servers) || 3,
+    max_servers: Math.max(1, Math.min(100, Number(max_servers) || 3)),
     ip_lock: Boolean(ip_lock),
-    bound_ip,
+    bound_ip: bound_ip ? String(bound_ip).trim().slice(0, 60) : null,
     created_at: new Date().toISOString(),
-    expires_at,
-    note,
+    expires_at: expires_at ? new Date(expires_at).toISOString() : null,
+    note: String(note || '').trim().slice(0, 255),
     servers: {}
   };
 
   saveLicenses(licenses);
-  pushConsole('SUCCESS', 'ADMIN', `✨ New license created: ${key} for ${owner} [Tier: ${tier}, Max: ${max_servers}]`);
+  pushConsole('SUCCESS', 'ADMIN', `✨ New license created: ${cleanKey} for ${licenses[cleanKey].owner} [Tier: ${licenses[cleanKey].tier}, Max: ${licenses[cleanKey].max_servers}]`);
   res.status(201).json({
     success: true,
     message: 'License created successfully',
-    license: licenses[key]
+    license: licenses[cleanKey]
   });
 });
 
