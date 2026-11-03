@@ -12,6 +12,7 @@ const CLIENT_API_KEY = process.env.CLIENT_API_KEY || 'rslogin-api-key-2026';
 const SECRET_SIGN_KEY = process.env.SECRET_SIGN_KEY || 'rslogin-sign-key-2026';
 const DATA_FILE = path.join(__dirname, 'data', 'licenses.json');
 const LOGS_FILE = path.join(__dirname, 'data', 'logs.json');
+const BANNED_IPS_FILE = path.join(__dirname, 'data', 'banned_ips.json');
 
 app.use(cors());
 app.use(express.json());
@@ -31,7 +32,6 @@ function loadLicenses() {
   } catch (err) {
     console.error('Error reading licenses file:', err.message);
   }
-  // Default seeded licenses if file doesn't exist
   const defaultLicenses = {
     'RS-DEFAULT-PREMIUM-KEY-2026': {
       key: 'RS-DEFAULT-PREMIUM-KEY-2026',
@@ -43,7 +43,8 @@ function loadLicenses() {
       max_servers: 5,
       created_at: new Date().toISOString(),
       expires_at: null,
-      note: 'Default master key for testing'
+      note: 'Default master key for testing',
+      servers: {}
     }
   };
   saveLicenses(defaultLicenses);
@@ -58,6 +59,25 @@ function saveLicenses(licenses) {
   }
 }
 
+function loadBannedIps() {
+  try {
+    if (fs.existsSync(BANNED_IPS_FILE)) {
+      return JSON.parse(fs.readFileSync(BANNED_IPS_FILE, 'utf8'));
+    }
+  } catch (err) {
+    console.error('Error reading banned_ips file:', err.message);
+  }
+  return {};
+}
+
+function saveBannedIps(banned) {
+  try {
+    fs.writeFileSync(BANNED_IPS_FILE, JSON.stringify(banned, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Error saving banned_ips file:', err.message);
+  }
+}
+
 function logValidation(entry) {
   try {
     let logs = [];
@@ -68,7 +88,7 @@ function logValidation(entry) {
       ...entry,
       timestamp: new Date().toISOString()
     });
-    if (logs.length > 200) logs = logs.slice(0, 200);
+    if (logs.length > 300) logs = logs.slice(0, 300);
     fs.writeFileSync(LOGS_FILE, JSON.stringify(logs, null, 2), 'utf8');
   } catch (err) {
     // Non-critical
@@ -92,7 +112,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ONLINE',
     service: 'RSLogin License Verification API',
-    version: '1.0.0',
+    version: '1.2.0',
     timestamp: new Date().toISOString()
   });
 });
@@ -103,6 +123,19 @@ app.post('/api/license/validate', (req, res) => {
   const { license_key, api_key, product, server_ip, port } = req.body;
   const clientIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress || server_ip;
 
+  // 1. IP Ban check
+  const bannedIps = loadBannedIps();
+  if (bannedIps[clientIp]) {
+    const banInfo = bannedIps[clientIp];
+    logValidation({ key: license_key || 'UNKNOWN', valid: false, reason: `IP ${clientIp} is BANNED (${banInfo.reason || 'Blacklisted'})`, ip: clientIp, product });
+    return res.status(403).json({
+      valid: false,
+      status: 'IP_BANNED',
+      message: `Your server IP (${clientIp}) is banned: ${banInfo.reason || 'Contact administrator.'}`
+    });
+  }
+
+  // 2. API Key authentication check
   const providedApiKey = req.headers['x-api-key'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '').trim() || api_key;
   if (CLIENT_API_KEY && providedApiKey !== CLIENT_API_KEY && providedApiKey !== ADMIN_SECRET) {
     logValidation({ key: license_key || 'UNKNOWN', valid: false, reason: 'Invalid or missing API key', ip: clientIp, product });
@@ -113,6 +146,7 @@ app.post('/api/license/validate', (req, res) => {
     });
   }
 
+  // 3. License key presence
   if (!license_key || typeof license_key !== 'string') {
     logValidation({ key: 'EMPTY', valid: false, reason: 'Missing license key', ip: clientIp, product });
     return res.status(400).json({
@@ -152,10 +186,9 @@ app.post('/api/license/validate', (req, res) => {
     });
   }
 
-  // IP Lock check
+  // 4. IP Lock check
   if (license.ip_lock) {
     if (!license.bound_ip && clientIp) {
-      // Auto-bind to first IP used
       license.bound_ip = clientIp;
       licenses[license_key.trim()] = license;
       saveLicenses(licenses);
@@ -169,12 +202,20 @@ app.post('/api/license/validate', (req, res) => {
     }
   }
 
-  const timestamp = Math.floor(Date.now() / 1000);
-  const signature = generateSignature(license.key, license.status, timestamp);
-
-  // Track connected server instance for this key
+  // 5. Server Count Limit check
   if (!license.servers) license.servers = {};
   const serverId = `${clientIp}:${port || 25565}`;
+  const existingServers = Object.keys(license.servers);
+  if (license.max_servers && !license.servers[serverId] && existingServers.length >= license.max_servers) {
+    logValidation({ key: license_key, valid: false, reason: `Max server limit reached (${existingServers.length}/${license.max_servers})`, ip: clientIp, product });
+    return res.status(200).json({
+      valid: false,
+      status: 'SERVER_LIMIT_REACHED',
+      message: `License server limit reached (${license.max_servers} max servers). Remove an unused server from the dashboard first.`
+    });
+  }
+
+  // 6. Record connected server
   license.servers[serverId] = {
     id: serverId,
     ip: clientIp,
@@ -185,6 +226,9 @@ app.post('/api/license/validate', (req, res) => {
   };
   licenses[license_key.trim()] = license;
   saveLicenses(licenses);
+
+  const timestamp = Math.floor(Date.now() / 1000);
+  const signature = generateSignature(license.key, license.status, timestamp);
 
   logValidation({ key: license_key, valid: true, owner: license.owner, ip: clientIp, product });
 
@@ -226,35 +270,9 @@ app.get('/api/admin/licenses', requireAdmin, (req, res) => {
   });
 });
 
-// Generate a new random license key
-app.post('/api/admin/licenses/generate', requireAdmin, (req, res) => {
-  const { owner = 'Customer', tier = 'PREMIUM', ip_lock = false, expires_at = null, note = '' } = req.body;
-  const key = generateKeyString();
-  const licenses = loadLicenses();
-
-  licenses[key] = {
-    key,
-    owner,
-    tier,
-    status: 'ACTIVE',
-    ip_lock: Boolean(ip_lock),
-    bound_ip: null,
-    created_at: new Date().toISOString(),
-    expires_at,
-    note
-  };
-
-  saveLicenses(licenses);
-  res.status(201).json({
-    success: true,
-    message: 'License generated successfully',
-    license: licenses[key]
-  });
-});
-
 // Create custom license
 app.post('/api/admin/licenses', requireAdmin, (req, res) => {
-  const { key, owner = 'Customer', tier = 'STANDARD', ip_lock = false, bound_ip = null, expires_at = null, note = '' } = req.body;
+  const { key, owner = 'Customer', tier = 'STANDARD', max_servers = 3, ip_lock = false, bound_ip = null, expires_at = null, note = '' } = req.body;
   if (!key) {
     return res.status(400).json({ error: 'key is required' });
   }
@@ -269,11 +287,13 @@ app.post('/api/admin/licenses', requireAdmin, (req, res) => {
     owner,
     tier,
     status: 'ACTIVE',
+    max_servers: Number(max_servers) || 3,
     ip_lock: Boolean(ip_lock),
     bound_ip,
     created_at: new Date().toISOString(),
     expires_at,
-    note
+    note,
+    servers: {}
   };
 
   saveLicenses(licenses);
@@ -284,7 +304,7 @@ app.post('/api/admin/licenses', requireAdmin, (req, res) => {
   });
 });
 
-// Update license status or settings
+// Update license
 app.put('/api/admin/licenses/:key', requireAdmin, (req, res) => {
   const licenses = loadLicenses();
   const key = req.params.key;
@@ -293,10 +313,11 @@ app.put('/api/admin/licenses/:key', requireAdmin, (req, res) => {
     return res.status(404).json({ error: 'License not found' });
   }
 
-  const { status, owner, tier, ip_lock, bound_ip, expires_at, note } = req.body;
+  const { status, owner, tier, max_servers, ip_lock, bound_ip, expires_at, note } = req.body;
   if (status) licenses[key].status = status;
   if (owner) licenses[key].owner = owner;
   if (tier) licenses[key].tier = tier;
+  if (max_servers !== undefined) licenses[key].max_servers = Number(max_servers);
   if (ip_lock !== undefined) licenses[key].ip_lock = Boolean(ip_lock);
   if (bound_ip !== undefined) licenses[key].bound_ip = bound_ip;
   if (expires_at !== undefined) licenses[key].expires_at = expires_at;
@@ -312,7 +333,46 @@ app.put('/api/admin/licenses/:key', requireAdmin, (req, res) => {
   });
 });
 
-// Delete license
+// Reset IP lock on a key (allows binding to a new IP)
+app.post('/api/admin/licenses/:key/reset-ip', requireAdmin, (req, res) => {
+  const licenses = loadLicenses();
+  const key = req.params.key;
+
+  if (!licenses[key]) {
+    return res.status(404).json({ error: 'License not found' });
+  }
+
+  licenses[key].bound_ip = null;
+  saveLicenses(licenses);
+
+  res.json({
+    success: true,
+    message: `IP lock for ${key} reset. Next connecting server IP will be bound.`
+  });
+});
+
+// Remove a connected server from a license key
+app.delete('/api/admin/licenses/:key/servers/:serverId', requireAdmin, (req, res) => {
+  const licenses = loadLicenses();
+  const { key, serverId } = req.params;
+
+  if (!licenses[key]) {
+    return res.status(404).json({ error: 'License not found' });
+  }
+
+  if (licenses[key].servers && licenses[key].servers[serverId]) {
+    delete licenses[key].servers[serverId];
+    saveLicenses(licenses);
+    return res.json({
+      success: true,
+      message: `Server ${serverId} removed from license ${key}`
+    });
+  }
+
+  res.status(404).json({ error: 'Server connection not found on this license' });
+});
+
+// Delete license permanently
 app.delete('/api/admin/licenses/:key', requireAdmin, (req, res) => {
   const licenses = loadLicenses();
   const key = req.params.key;
@@ -330,6 +390,60 @@ app.delete('/api/admin/licenses/:key', requireAdmin, (req, res) => {
   });
 });
 
+// ---------------------- Banned IPs Management ----------------------
+
+// List all banned IPs
+app.get('/api/admin/banned-ips', requireAdmin, (req, res) => {
+  const banned = loadBannedIps();
+  res.json({
+    count: Object.keys(banned).length,
+    banned_ips: Object.values(banned)
+  });
+});
+
+// Ban an IP
+app.post('/api/admin/banned-ips', requireAdmin, (req, res) => {
+  const { ip, reason = 'Administrative ban' } = req.body;
+  if (!ip) {
+    return res.status(400).json({ error: 'IP address is required' });
+  }
+
+  const banned = loadBannedIps();
+  const cleanIp = ip.trim();
+  banned[cleanIp] = {
+    ip: cleanIp,
+    reason: reason.trim(),
+    banned_at: new Date().toISOString()
+  };
+
+  saveBannedIps(banned);
+  res.status(201).json({
+    success: true,
+    message: `IP ${cleanIp} has been banned.`,
+    entry: banned[cleanIp]
+  });
+});
+
+// Unban an IP
+app.delete('/api/admin/banned-ips/:ip', requireAdmin, (req, res) => {
+  const cleanIp = req.params.ip.trim();
+  const banned = loadBannedIps();
+
+  if (!banned[cleanIp]) {
+    return res.status(404).json({ error: 'IP not found in ban list' });
+  }
+
+  delete banned[cleanIp];
+  saveBannedIps(banned);
+
+  res.json({
+    success: true,
+    message: `IP ${cleanIp} has been unbanned.`
+  });
+});
+
+// ---------------------- Audit Logs Management ----------------------
+
 // View validation logs
 app.get('/api/admin/logs', requireAdmin, (req, res) => {
   try {
@@ -338,6 +452,16 @@ app.get('/api/admin/logs', requireAdmin, (req, res) => {
       logs = JSON.parse(fs.readFileSync(LOGS_FILE, 'utf8'));
     }
     res.json({ logs });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Clear validation logs
+app.delete('/api/admin/logs', requireAdmin, (req, res) => {
+  try {
+    fs.writeFileSync(LOGS_FILE, JSON.stringify([], null, 2), 'utf8');
+    res.json({ success: true, message: 'Audit logs cleared successfully.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

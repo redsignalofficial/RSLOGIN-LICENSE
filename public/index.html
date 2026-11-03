@@ -85,7 +85,7 @@
     </div>
   </div>
 
-  <!-- DASHBOARD SCREEN (hidden by default) -->
+  <!-- DASHBOARD SCREEN -->
   <div id="dashboard-view" class="hidden flex-1 flex flex-col">
     <!-- Navbar -->
     <header class="border-b border-zinc-800/80 glass sticky top-0 z-40">
@@ -96,27 +96,30 @@
           </div>
           <div>
             <span class="font-bold text-white text-base tracking-tight">RSLogin</span>
-            <span class="ml-2 text-xs px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 font-medium">License Core</span>
+            <span class="ml-2 text-xs px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 font-medium">Control Center</span>
           </div>
         </div>
 
         <!-- Navigation Tabs -->
         <nav class="hidden md:flex items-center gap-1 bg-zinc-900/80 p-1 rounded-xl border border-zinc-800">
-          <button onclick="switchTab('overview')" id="nav-overview" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-zinc-800 transition-all flex items-center gap-2">
+          <button onclick="switchTab('overview')" id="nav-overview" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-zinc-800 transition-all flex items-center gap-1.5">
             <i class="fa-solid fa-chart-pie text-zinc-400"></i> Overview
           </button>
-          <button onclick="switchTab('licenses')" id="nav-licenses" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-2">
-            <i class="fa-solid fa-key"></i> License Keys
+          <button onclick="switchTab('licenses')" id="nav-licenses" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-1.5">
+            <i class="fa-solid fa-key"></i> Licenses
           </button>
-          <button onclick="switchTab('servers')" id="nav-servers" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-2">
-            <i class="fa-solid fa-server"></i> Connected Servers
+          <button onclick="switchTab('servers')" id="nav-servers" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-1.5">
+            <i class="fa-solid fa-server"></i> Servers
           </button>
-          <button onclick="switchTab('logs')" id="nav-logs" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-2">
+          <button onclick="switchTab('banned')" id="nav-banned" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-1.5">
+            <i class="fa-solid fa-ban text-red-400"></i> Banned IPs
+          </button>
+          <button onclick="switchTab('logs')" id="nav-logs" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-1.5">
             <i class="fa-solid fa-list-check"></i> Audit Logs
           </button>
         </nav>
 
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 sm:gap-3">
           <button onclick="refreshData()" title="Refresh" class="p-2 text-zinc-400 hover:text-white hover:bg-zinc-900 rounded-lg transition-all border border-zinc-800">
             <i id="refresh-icon" class="fa-solid fa-arrows-rotate text-sm"></i>
           </button>
@@ -134,18 +137,18 @@
       <section id="tab-overview" class="space-y-6">
         <!-- Stats Cards -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden">
+          <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5">
             <div class="flex items-center justify-between mb-3">
-              <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Total Keys</span>
+              <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Total Licenses</span>
               <div class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center">
                 <i class="fa-solid fa-key text-sm"></i>
               </div>
             </div>
             <div id="stat-total" class="text-3xl font-extrabold text-white">0</div>
-            <div class="text-xs text-zinc-500 mt-1">Registered in database</div>
+            <div class="text-xs text-zinc-500 mt-1">Configured keys</div>
           </div>
 
-          <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden">
+          <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5">
             <div class="flex items-center justify-between mb-3">
               <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Active Licenses</span>
               <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
@@ -153,10 +156,10 @@
               </div>
             </div>
             <div id="stat-active" class="text-3xl font-extrabold text-emerald-400">0</div>
-            <div class="text-xs text-zinc-500 mt-1">Authorized for production</div>
+            <div class="text-xs text-zinc-500 mt-1">Authorized for server boot</div>
           </div>
 
-          <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden">
+          <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5">
             <div class="flex items-center justify-between mb-3">
               <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Connected Servers</span>
               <div class="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center">
@@ -164,41 +167,46 @@
               </div>
             </div>
             <div id="stat-servers" class="text-3xl font-extrabold text-purple-400">0</div>
-            <div class="text-xs text-zinc-500 mt-1">Paper / Velocity instances</div>
+            <div class="text-xs text-zinc-500 mt-1">Active Minecraft server nodes</div>
           </div>
 
-          <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 relative overflow-hidden">
+          <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5">
             <div class="flex items-center justify-between mb-3">
-              <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Suspended / Revoked</span>
-              <div class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
+              <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Banned IPs</span>
+              <div class="w-8 h-8 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center">
                 <i class="fa-solid fa-ban text-sm"></i>
               </div>
             </div>
-            <div id="stat-suspended" class="text-3xl font-extrabold text-amber-400">0</div>
-            <div class="text-xs text-zinc-500 mt-1">Denied authentication</div>
+            <div id="stat-banned" class="text-3xl font-extrabold text-red-400">0</div>
+            <div class="text-xs text-zinc-500 mt-1">Blocked from connecting</div>
           </div>
         </div>
 
-        <!-- Quick Info Box -->
+        <!-- Quick Actions Banner -->
         <div class="bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 border border-zinc-800/80 rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div class="space-y-1">
             <h2 class="text-base font-bold text-white flex items-center gap-2">
-              <i class="fa-solid fa-cube text-red-500"></i> Active RSLogin Verification Node
+              <i class="fa-solid fa-shield text-red-500"></i> RSLogin Protection Center
             </h2>
             <p class="text-xs text-zinc-400 max-w-xl">
-              All license authentications are cryptographically signed using HMAC-SHA256. Obfuscated credentials inside the client plugin communicate with this dashboard endpoint.
+              You can issue new license keys, disconnect unauthorized servers, reset bound IPs, or permanently block suspicious server IPs.
             </p>
           </div>
-          <button onclick="openCreateModal()" class="shrink-0 bg-red-600 hover:bg-red-500 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-red-600/20 transition-all flex items-center gap-2">
-            <i class="fa-solid fa-plus"></i> Generate License Key
-          </button>
+          <div class="flex items-center gap-2">
+            <button onclick="openBanModal()" class="shrink-0 bg-zinc-800 hover:bg-zinc-700 text-red-400 border border-red-500/20 font-semibold text-xs px-3.5 py-2.5 rounded-xl transition-all flex items-center gap-1.5">
+              <i class="fa-solid fa-ban"></i> Ban IP
+            </button>
+            <button onclick="openCreateModal()" class="shrink-0 bg-red-600 hover:bg-red-500 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-red-600/20 transition-all flex items-center gap-1.5">
+              <i class="fa-solid fa-plus"></i> Generate License
+            </button>
+          </div>
         </div>
 
         <!-- Recent Validations Table -->
         <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl overflow-hidden">
           <div class="px-6 py-4 border-b border-zinc-800 flex items-center justify-between">
             <h3 class="text-sm font-bold text-white flex items-center gap-2">
-              <i class="fa-solid fa-clock-rotate-left text-zinc-400"></i> Recent Heartbeats & Validations
+              <i class="fa-solid fa-clock-rotate-left text-zinc-400"></i> Latest Server Requests
             </h3>
             <button onclick="switchTab('logs')" class="text-xs text-red-400 hover:text-red-300 font-semibold">View All Logs &rarr;</button>
           </div>
@@ -208,13 +216,14 @@
                 <tr>
                   <th class="px-6 py-3">Time</th>
                   <th class="px-6 py-3">License Key</th>
-                  <th class="px-6 py-3">IP / Port</th>
-                  <th class="px-6 py-3">Product</th>
-                  <th class="px-6 py-3">Status</th>
+                  <th class="px-6 py-3">Server IP</th>
+                  <th class="px-6 py-3">Platform</th>
+                  <th class="px-6 py-3">Outcome</th>
+                  <th class="px-6 py-3 text-right">Quick Action</th>
                 </tr>
               </thead>
               <tbody id="recent-logs-table" class="divide-y divide-zinc-800/60 text-zinc-300">
-                <tr><td colspan="5" class="px-6 py-6 text-center text-zinc-500">Loading recent logs...</td></tr>
+                <tr><td colspan="6" class="px-6 py-6 text-center text-zinc-500">Loading recent logs...</td></tr>
               </tbody>
             </table>
           </div>
@@ -229,7 +238,7 @@
             <input id="license-search" oninput="filterLicenses()" type="text" placeholder="Search by key, owner, or status..."
               class="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-red-500 font-mono">
           </div>
-          <button onclick="openCreateModal()" class="bg-red-600 hover:bg-red-500 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-red-600/20 transition-all flex items-center justify-center gap-2">
+          <button onclick="openCreateModal()" class="bg-red-600 hover:bg-red-500 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-red-600/20 transition-all flex items-center justify-center gap-1.5">
             <i class="fa-solid fa-plus"></i> Create New Key
           </button>
         </div>
@@ -240,7 +249,7 @@
               <thead class="bg-zinc-950/60 text-zinc-400 uppercase tracking-wider font-semibold border-b border-zinc-800">
                 <tr>
                   <th class="px-6 py-3.5">License Key</th>
-                  <th class="px-6 py-3.5">Owner / Customer</th>
+                  <th class="px-6 py-3.5">Owner</th>
                   <th class="px-6 py-3.5">Tier</th>
                   <th class="px-6 py-3.5">Servers Connected</th>
                   <th class="px-6 py-3.5">IP Lock</th>
@@ -259,21 +268,28 @@
       <!-- TAB 3: CONNECTED SERVERS -->
       <section id="tab-servers" class="hidden space-y-4">
         <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-6">
-          <h2 class="text-base font-bold text-white mb-1 flex items-center gap-2">
-            <i class="fa-solid fa-network-wired text-purple-400"></i> Active Minecraft Servers
-          </h2>
-          <p class="text-xs text-zinc-400 mb-6">List of all Paper and Velocity backend nodes actively heartbeat-checking with this license server.</p>
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-base font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-network-wired text-purple-400"></i> Connected Minecraft Server Nodes
+              </h2>
+              <p class="text-xs text-zinc-400">Every server instance heartbeat-checking with your license server. You can disconnect or ban them directly.</p>
+            </div>
+            <button onclick="refreshData()" class="text-xs text-zinc-400 hover:text-white px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-950 flex items-center gap-1.5">
+              <i class="fa-solid fa-rotate-right"></i> Refresh
+            </button>
+          </div>
 
           <div class="overflow-x-auto">
             <table class="w-full text-left text-xs">
               <thead class="bg-zinc-950/60 text-zinc-400 uppercase tracking-wider font-semibold border-b border-zinc-800">
                 <tr>
-                  <th class="px-6 py-3.5">Server Address</th>
-                  <th class="px-6 py-3.5">Associated License Key</th>
+                  <th class="px-6 py-3.5">Server Address (IP:Port)</th>
+                  <th class="px-6 py-3.5">License Key</th>
+                  <th class="px-6 py-3.5">Owner</th>
                   <th class="px-6 py-3.5">Platform</th>
-                  <th class="px-6 py-3.5">First Seen</th>
                   <th class="px-6 py-3.5">Last Ping</th>
-                  <th class="px-6 py-3.5">Health</th>
+                  <th class="px-6 py-3.5 text-right">Manage Server</th>
                 </tr>
               </thead>
               <tbody id="all-servers-table-body" class="divide-y divide-zinc-800/60 text-zinc-300">
@@ -284,19 +300,57 @@
         </div>
       </section>
 
-      <!-- TAB 4: AUDIT LOGS -->
+      <!-- TAB 4: BANNED IPS -->
+      <section id="tab-banned" class="hidden space-y-4">
+        <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-6">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
+            <div>
+              <h2 class="text-base font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-ban text-red-500"></i> Blacklisted Server IPs
+              </h2>
+              <p class="text-xs text-zinc-400">IP addresses listed here will be refused with 403 IP_BANNED on every verification request.</p>
+            </div>
+            <button onclick="openBanModal()" class="bg-red-600 hover:bg-red-500 text-white font-semibold text-xs px-4 py-2 rounded-xl shadow-lg shadow-red-600/20 transition-all flex items-center gap-1.5">
+              <i class="fa-solid fa-plus"></i> Ban New IP
+            </button>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-zinc-950/60 text-zinc-400 uppercase tracking-wider font-semibold border-b border-zinc-800">
+                <tr>
+                  <th class="px-6 py-3.5">Banned IP Address</th>
+                  <th class="px-6 py-3.5">Reason</th>
+                  <th class="px-6 py-3.5">Banned At</th>
+                  <th class="px-6 py-3.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="banned-ips-table-body" class="divide-y divide-zinc-800/60 text-zinc-300">
+                <tr><td colspan="4" class="px-6 py-8 text-center text-zinc-500">No IPs currently banned.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: AUDIT LOGS -->
       <section id="tab-logs" class="hidden space-y-4">
         <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-6">
           <div class="flex items-center justify-between mb-4">
             <div>
               <h2 class="text-base font-bold text-white flex items-center gap-2">
-                <i class="fa-solid fa-list-check text-blue-400"></i> Full Verification Log History
+                <i class="fa-solid fa-list-check text-blue-400"></i> Full Verification Audit Logs
               </h2>
               <p class="text-xs text-zinc-400">Audit trail of all incoming plugin requests</p>
             </div>
-            <button onclick="refreshData()" class="text-xs text-zinc-400 hover:text-white px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-950 flex items-center gap-1.5">
-              <i class="fa-solid fa-rotate-right"></i> Refresh Logs
-            </button>
+            <div class="flex items-center gap-2">
+              <button onclick="clearLogs()" class="text-xs text-zinc-400 hover:text-red-400 px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-950 flex items-center gap-1.5">
+                <i class="fa-regular fa-trash-can"></i> Clear Logs
+              </button>
+              <button onclick="refreshData()" class="text-xs text-zinc-400 hover:text-white px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-950 flex items-center gap-1.5">
+                <i class="fa-solid fa-rotate-right"></i> Refresh
+              </button>
+            </div>
           </div>
 
           <div class="overflow-x-auto">
@@ -309,10 +363,11 @@
                   <th class="px-6 py-3">Product</th>
                   <th class="px-6 py-3">Outcome</th>
                   <th class="px-6 py-3">Details / Reason</th>
+                  <th class="px-6 py-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody id="full-logs-table-body" class="divide-y divide-zinc-800/60 text-zinc-300">
-                <tr><td colspan="6" class="px-6 py-8 text-center text-zinc-500">Loading logs...</td></tr>
+                <tr><td colspan="7" class="px-6 py-8 text-center text-zinc-500">Loading logs...</td></tr>
               </tbody>
             </table>
           </div>
@@ -390,13 +445,44 @@
     </div>
   </div>
 
-  <!-- MODAL: VIEW SERVERS FOR SPECIFIC KEY -->
+  <!-- MODAL: BAN IP -->
+  <div id="modal-ban" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-ban text-red-500"></i> Blacklist / Ban Server IP
+        </h3>
+        <button onclick="closeBanModal()" class="text-zinc-500 hover:text-zinc-300">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="ban-ip-form" onsubmit="handleBanIp(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">Server IP Address</label>
+          <input id="ban-ip-input" type="text" required placeholder="e.g. 192.168.1.100"
+            class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-red-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">Reason for Ban</label>
+          <input id="ban-reason-input" type="text" placeholder="e.g. Key leak / Unauthorized server"
+            class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-red-500">
+        </div>
+        <div class="pt-3 flex items-center justify-end gap-2 border-t border-zinc-800">
+          <button type="button" onclick="closeBanModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white bg-zinc-800/80">Cancel</button>
+          <button type="submit" class="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-red-600 hover:bg-red-500">Ban Server IP</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: VIEW & REMOVE SERVERS FOR KEY -->
   <div id="modal-key-servers" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
     <div class="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative">
       <div class="flex items-center justify-between mb-4">
         <div>
           <h3 class="text-base font-bold text-white flex items-center gap-2">
-            <i class="fa-solid fa-server text-purple-400"></i> Servers Active for Key
+            <i class="fa-solid fa-server text-purple-400"></i> Connected Servers for License
           </h3>
           <p id="modal-key-subtitle" class="text-xs font-mono text-zinc-400 mt-0.5">RS-XXXX-XXXX</p>
         </div>
@@ -412,8 +498,8 @@
               <th class="px-4 py-2.5">IP Address</th>
               <th class="px-4 py-2.5">Port</th>
               <th class="px-4 py-2.5">Platform</th>
-              <th class="px-4 py-2.5">First Connected</th>
               <th class="px-4 py-2.5">Last Ping</th>
+              <th class="px-4 py-2.5 text-right">Actions</th>
             </tr>
           </thead>
           <tbody id="modal-servers-table-body" class="divide-y divide-zinc-800/60 text-zinc-300">
@@ -432,8 +518,9 @@
     let token = localStorage.getItem('rslogin_admin_token') || '';
     let globalLicenses = [];
     let globalLogs = [];
+    let globalBannedIps = [];
+    let currentKeyForServers = '';
 
-    // Init check
     document.addEventListener('DOMContentLoaded', () => {
       if (token) {
         showDashboard();
@@ -450,7 +537,6 @@
       toastMsg.innerText = message;
       if (isError) {
         toastIcon.className = 'fa-solid fa-circle-exclamation text-red-400 text-lg';
-        toast.className = toast.className.replace('border-green-500/20', '') + ' border-red-500/30';
       } else {
         toastIcon.className = 'fa-solid fa-circle-check text-green-400 text-lg';
       }
@@ -521,18 +607,20 @@
     }
 
     function switchTab(tab) {
-      ['overview', 'licenses', 'servers', 'logs'].forEach(t => {
-        document.getElementById(`tab-${t}`).classList.add('hidden');
+      ['overview', 'licenses', 'servers', 'banned', 'logs'].forEach(t => {
+        const el = document.getElementById(`tab-${t}`);
+        if (el) el.classList.add('hidden');
         const btn = document.getElementById(`nav-${t}`);
         if (btn) {
-          btn.className = 'tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-2';
+          btn.className = 'tab-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-1.5';
         }
       });
 
-      document.getElementById(`tab-${tab}`).classList.remove('hidden');
+      const activeEl = document.getElementById(`tab-${tab}`);
+      if (activeEl) activeEl.classList.remove('hidden');
       const activeBtn = document.getElementById(`nav-${tab}`);
       if (activeBtn) {
-        activeBtn.className = 'tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-zinc-800 transition-all flex items-center gap-2';
+        activeBtn.className = 'tab-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-zinc-800 transition-all flex items-center gap-1.5';
       }
     }
 
@@ -541,9 +629,10 @@
       if (icon) icon.classList.add('animate-spin');
 
       try {
-        const [licRes, logRes] = await Promise.all([
+        const [licRes, logRes, banRes] = await Promise.all([
           fetch('/api/admin/licenses', { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch('/api/admin/logs', { headers: { 'Authorization': `Bearer ${token}` } })
+          fetch('/api/admin/logs', { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch('/api/admin/banned-ips', { headers: { 'Authorization': `Bearer ${token}` } })
         ]);
 
         if (licRes.status === 401 || licRes.status === 403) {
@@ -553,14 +642,17 @@
 
         const licData = await licRes.json();
         const logData = await logRes.json();
+        const banData = await banRes.json();
 
         globalLicenses = licData.licenses || [];
         globalLogs = logData.logs || [];
+        globalBannedIps = banData.banned_ips || [];
 
         renderStats();
         renderLicensesTable(globalLicenses);
         renderRecentLogs();
         renderAllServers();
+        renderBannedIpsTable();
         renderFullLogs();
       } catch (err) {
         showToast('Error refreshing data: ' + err.message, true);
@@ -572,7 +664,7 @@
     function renderStats() {
       document.getElementById('stat-total').innerText = globalLicenses.length;
       document.getElementById('stat-active').innerText = globalLicenses.filter(l => l.status === 'ACTIVE').length;
-      document.getElementById('stat-suspended').innerText = globalLicenses.filter(l => l.status !== 'ACTIVE').length;
+      document.getElementById('stat-banned').innerText = globalBannedIps.length;
 
       let totalServers = 0;
       globalLicenses.forEach(l => {
@@ -586,12 +678,13 @@
     function renderLicensesTable(licenses) {
       const tbody = document.getElementById('licenses-table-body');
       if (!licenses || licenses.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-zinc-500">No licenses found matching your search.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-zinc-500">No licenses found.</td></tr>';
         return;
       }
 
       tbody.innerHTML = licenses.map(lic => {
         const serverCount = lic.servers ? Object.keys(lic.servers).length : 0;
+        const maxServers = lic.max_servers || 3;
         const statusBadge = lic.status === 'ACTIVE'
           ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Active</span>'
           : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">Suspended</span>';
@@ -611,19 +704,24 @@
             <td class="px-6 py-4">
               <button onclick="openServersModal('${lic.key}')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-purple-300 font-medium transition-all">
                 <i class="fa-solid fa-server text-[10px]"></i>
-                <span>${serverCount} server${serverCount === 1 ? '' : 's'}</span>
+                <span>${serverCount} / ${maxServers}</span>
               </button>
             </td>
             <td class="px-6 py-4 text-zinc-400">
-              ${lic.ip_lock ? `<span class="text-amber-400 font-mono text-[11px]" title="${lic.bound_ip || 'Will bind on first ping'}">Locked (${lic.bound_ip ? lic.bound_ip : 'Pending'})</span>` : '<span class="text-zinc-500">Unlocked</span>'}
+              ${lic.ip_lock ? `
+                <div class="flex items-center gap-1.5">
+                  <span class="text-amber-400 font-mono text-[11px]">${lic.bound_ip ? lic.bound_ip : 'Pending bind'}</span>
+                  ${lic.bound_ip ? `<button onclick="resetIpLock('${lic.key}')" title="Reset IP lock" class="text-zinc-500 hover:text-amber-400"><i class="fa-solid fa-rotate-left text-[10px]"></i></button>` : ''}
+                </div>
+              ` : '<span class="text-zinc-500">Unlocked</span>'}
             </td>
             <td class="px-6 py-4">${statusBadge}</td>
-            <td class="px-6 py-4 text-right space-x-2">
+            <td class="px-6 py-4 text-right space-x-1.5">
               <button onclick="toggleLicenseStatus('${lic.key}', '${lic.status}')" title="${lic.status === 'ACTIVE' ? 'Suspend' : 'Activate'}"
                 class="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
                 <i class="fa-solid ${lic.status === 'ACTIVE' ? 'fa-pause text-amber-400' : 'fa-play text-emerald-400'}"></i>
               </button>
-              <button onclick="deleteLicense('${lic.key}')" title="Delete"
+              <button onclick="deleteLicense('${lic.key}')" title="Remove License Key"
                 class="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-zinc-800 transition-colors">
                 <i class="fa-regular fa-trash-can"></i>
               </button>
@@ -649,17 +747,17 @@
 
     function renderRecentLogs() {
       const tbody = document.getElementById('recent-logs-table');
-      const recent = globalLogs.slice(0, 5);
+      const recent = globalLogs.slice(0, 6);
 
       if (recent.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-6 text-center text-zinc-500">No validations recorded yet.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-6 text-center text-zinc-500">No requests recorded yet.</td></tr>';
         return;
       }
 
       tbody.innerHTML = recent.map(log => {
         const statusBadge = log.valid
-          ? '<span class="text-emerald-400 font-semibold"><i class="fa-solid fa-check text-[10px]"></i> Valid</span>'
-          : `<span class="text-red-400 font-semibold"><i class="fa-solid fa-xmark text-[10px]"></i> ${log.reason || 'Denied'}</span>`;
+          ? '<span class="text-emerald-400 font-semibold"><i class="fa-solid fa-check text-[10px]"></i> Allowed</span>'
+          : `<span class="text-red-400 font-semibold"><i class="fa-solid fa-xmark text-[10px]"></i> ${escapeHtml(log.reason || 'Denied')}</span>`;
 
         const timeStr = log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : '—';
 
@@ -670,6 +768,11 @@
             <td class="px-6 py-3 font-mono text-zinc-400">${log.ip || '—'}</td>
             <td class="px-6 py-3 text-zinc-400">${log.product || 'plugin'}</td>
             <td class="px-6 py-3">${statusBadge}</td>
+            <td class="px-6 py-3 text-right">
+              ${log.ip && log.ip !== '127.0.0.1' ? `
+                <button onclick="promptBanIp('${log.ip}')" class="text-xs text-red-400 hover:text-red-300 font-medium">Ban IP</button>
+              ` : '—'}
+            </td>
           </tr>
         `;
       }).join('');
@@ -692,33 +795,60 @@
       });
 
       if (serverList.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-zinc-500">No servers have pinged this license server yet.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-zinc-500">No servers connected yet.</td></tr>';
         return;
       }
 
       tbody.innerHTML = serverList.map(srv => {
         const lastSeenDate = srv.last_seen ? new Date(srv.last_seen) : null;
-        const isOnline = lastSeenDate && (Date.now() - lastSeenDate.getTime() < 1000 * 60 * 60 * 24); // within 24h
         
         return `
           <tr class="hover:bg-zinc-800/30">
             <td class="px-6 py-3.5 font-mono text-white font-medium">${srv.ip}:${srv.port || 25565}</td>
             <td class="px-6 py-3.5 font-mono text-zinc-400 text-[11px]">${srv.license_key}</td>
+            <td class="px-6 py-3.5 text-zinc-300">${escapeHtml(srv.owner || '—')}</td>
             <td class="px-6 py-3.5"><span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 text-[10px]">${srv.product}</span></td>
-            <td class="px-6 py-3.5 text-zinc-400">${srv.first_seen ? new Date(srv.first_seen).toLocaleDateString() : '—'}</td>
             <td class="px-6 py-3.5 text-zinc-300 font-mono text-[11px]">${lastSeenDate ? lastSeenDate.toLocaleTimeString() : '—'}</td>
-            <td class="px-6 py-3.5">
-              ${isOnline ? '<span class="text-emerald-400 font-medium flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Active</span>' : '<span class="text-zinc-500">Idle</span>'}
+            <td class="px-6 py-3.5 text-right space-x-2">
+              <button onclick="removeServerConnection('${srv.license_key}', '${srv.id}')" title="Disconnect Server"
+                class="px-2.5 py-1 rounded-lg text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-all">
+                <i class="fa-solid fa-link-slash text-[10px] text-amber-400"></i> Disconnect
+              </button>
+              <button onclick="promptBanIp('${srv.ip}')" title="Ban Server IP"
+                class="px-2.5 py-1 rounded-lg text-xs bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-500/20 transition-all">
+                <i class="fa-solid fa-ban text-[10px]"></i> Ban IP
+              </button>
             </td>
           </tr>
         `;
       }).join('');
     }
 
+    function renderBannedIpsTable() {
+      const tbody = document.getElementById('banned-ips-table-body');
+      if (globalBannedIps.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-8 text-center text-zinc-500">No IP addresses are currently blacklisted.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = globalBannedIps.map(item => `
+        <tr class="hover:bg-zinc-800/30">
+          <td class="px-6 py-3.5 font-mono text-red-400 font-semibold">${item.ip}</td>
+          <td class="px-6 py-3.5 text-zinc-300">${escapeHtml(item.reason || 'Manual ban')}</td>
+          <td class="px-6 py-3.5 text-zinc-400 text-xs">${item.banned_at ? new Date(item.banned_at).toLocaleString() : '—'}</td>
+          <td class="px-6 py-3.5 text-right">
+            <button onclick="unbanIp('${item.ip}')" class="px-3 py-1 rounded-lg text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white transition-all">
+              <i class="fa-solid fa-unlock text-[10px] text-emerald-400"></i> Unban IP
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
     function renderFullLogs() {
       const tbody = document.getElementById('full-logs-table-body');
       if (globalLogs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-zinc-500">No audit logs recorded yet.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-zinc-500">No audit logs recorded yet.</td></tr>';
         return;
       }
 
@@ -734,7 +864,14 @@
             <td class="px-6 py-3 font-mono text-zinc-400">${log.ip || '—'}</td>
             <td class="px-6 py-3 text-zinc-400">${log.product || '—'}</td>
             <td class="px-6 py-3">${statusBadge}</td>
-            <td class="px-6 py-3 text-zinc-400">${log.reason || log.owner || '—'}</td>
+            <td class="px-6 py-3 text-zinc-400">${escapeHtml(log.reason || log.owner || '—')}</td>
+            <td class="px-6 py-3 text-right">
+              ${log.ip && log.ip !== '127.0.0.1' ? `
+                <button onclick="promptBanIp('${log.ip}')" title="Ban this IP" class="text-zinc-500 hover:text-red-400">
+                  <i class="fa-solid fa-ban text-xs"></i>
+                </button>
+              ` : '—'}
+            </td>
           </tr>
         `;
       }).join('');
@@ -811,8 +948,27 @@
       }
     }
 
+    async function resetIpLock(key) {
+      if (!confirm(`Reset bound IP for ${key}? The next server to connect will bind its IP.`)) return;
+
+      try {
+        const res = await fetch(`/api/admin/licenses/${key}/reset-ip`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          showToast(`IP lock reset for ${key}`);
+          refreshData();
+        } else {
+          showToast('Failed to reset IP lock', true);
+        }
+      } catch (err) {
+        showToast('Error: ' + err.message, true);
+      }
+    }
+
     async function deleteLicense(key) {
-      if (!confirm(`Are you sure you want to permanently delete license ${key}?`)) return;
+      if (!confirm(`Are you sure you want to permanently delete license ${key}? Any servers using this key will immediately be disabled.`)) return;
 
       try {
         const res = await fetch(`/api/admin/licenses/${key}`, {
@@ -821,7 +977,7 @@
         });
 
         if (res.ok) {
-          showToast(`License ${key} deleted`);
+          showToast(`License ${key} removed`);
           refreshData();
         } else {
           showToast('Failed to delete license', true);
@@ -832,6 +988,7 @@
     }
 
     function openServersModal(key) {
+      currentKeyForServers = key;
       const lic = globalLicenses.find(l => l.key === key);
       if (!lic) return;
 
@@ -847,8 +1004,15 @@
             <td class="px-4 py-2.5 font-mono text-white font-medium">${srv.ip}</td>
             <td class="px-4 py-2.5 font-mono text-zinc-400">${srv.port || 25565}</td>
             <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 text-[10px]">${srv.product || 'plugin'}</span></td>
-            <td class="px-4 py-2.5 text-zinc-400">${srv.first_seen ? new Date(srv.first_seen).toLocaleDateString() : '—'}</td>
             <td class="px-4 py-2.5 text-zinc-300 font-mono text-[11px]">${srv.last_seen ? new Date(srv.last_seen).toLocaleTimeString() : '—'}</td>
+            <td class="px-4 py-2.5 text-right space-x-1.5">
+              <button onclick="removeServerConnection('${key}', '${srv.id}')" title="Disconnect Server" class="text-xs text-amber-400 hover:text-amber-300 font-medium">
+                <i class="fa-solid fa-link-slash"></i> Remove
+              </button>
+              <button onclick="promptBanIp('${srv.ip}')" title="Ban Server IP" class="text-xs text-red-400 hover:text-red-300 font-medium ml-2">
+                <i class="fa-solid fa-ban"></i> Ban
+              </button>
+            </td>
           </tr>
         `).join('');
       }
@@ -860,6 +1024,111 @@
       document.getElementById('modal-key-servers').classList.add('hidden');
     }
 
+    async function removeServerConnection(key, serverId) {
+      if (!confirm(`Disconnect server ${serverId} from license ${key}?`)) return;
+
+      try {
+        const res = await fetch(`/api/admin/licenses/${encodeURIComponent(key)}/servers/${encodeURIComponent(serverId)}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (res.ok) {
+          showToast(`Server disconnected`);
+          refreshData();
+          if (!document.getElementById('modal-key-servers').classList.contains('hidden')) {
+            openServersModal(key);
+          }
+        } else {
+          showToast('Failed to disconnect server', true);
+        }
+      } catch (err) {
+        showToast('Error: ' + err.message, true);
+      }
+    }
+
+    // IP Ban Handlers
+    function openBanModal() {
+      document.getElementById('ban-ip-input').value = '';
+      document.getElementById('ban-reason-input').value = '';
+      document.getElementById('modal-ban').classList.remove('hidden');
+    }
+
+    function closeBanModal() {
+      document.getElementById('modal-ban').classList.add('hidden');
+    }
+
+    function promptBanIp(ip) {
+      document.getElementById('ban-ip-input').value = ip;
+      document.getElementById('ban-reason-input').value = 'Unauthorized server activity';
+      document.getElementById('modal-ban').classList.remove('hidden');
+    }
+
+    async function handleBanIp(e) {
+      e.preventDefault();
+      const ip = document.getElementById('ban-ip-input').value.trim();
+      const reason = document.getElementById('ban-reason-input').value.trim();
+
+      try {
+        const res = await fetch('/api/admin/banned-ips', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ ip, reason })
+        });
+
+        if (res.ok) {
+          showToast(`IP ${ip} has been blacklisted`);
+          closeBanModal();
+          refreshData();
+        } else {
+          const d = await res.json();
+          showToast(d.error || 'Failed to ban IP', true);
+        }
+      } catch (err) {
+        showToast('Error: ' + err.message, true);
+      }
+    }
+
+    async function unbanIp(ip) {
+      if (!confirm(`Unban IP ${ip}?`)) return;
+
+      try {
+        const res = await fetch(`/api/admin/banned-ips/${encodeURIComponent(ip)}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (res.ok) {
+          showToast(`IP ${ip} unbanned`);
+          refreshData();
+        } else {
+          showToast('Failed to unban IP', true);
+        }
+      } catch (err) {
+        showToast('Error: ' + err.message, true);
+      }
+    }
+
+    async function clearLogs() {
+      if (!confirm('Clear all audit logs?')) return;
+
+      try {
+        const res = await fetch('/api/admin/logs', {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          showToast('Audit logs cleared');
+          refreshData();
+        }
+      } catch (err) {
+        showToast('Error: ' + err.message, true);
+      }
+    }
+
     function copyToClipboard(text) {
       navigator.clipboard.writeText(text).then(() => {
         showToast('Copied to clipboard: ' + text);
@@ -869,7 +1138,7 @@
     }
 
     function escapeHtml(str) {
-      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+      return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
     }
   </script>
 </body>
