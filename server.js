@@ -8,6 +8,7 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 10000;
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'rslogin-admin-secret-change-me';
+const CLIENT_API_KEY = process.env.CLIENT_API_KEY || 'rslogin-api-key-2026';
 const SECRET_SIGN_KEY = process.env.SECRET_SIGN_KEY || 'rslogin-sign-key-2026';
 const DATA_FILE = path.join(__dirname, 'data', 'licenses.json');
 const LOGS_FILE = path.join(__dirname, 'data', 'logs.json');
@@ -98,8 +99,18 @@ app.get(['/', '/health'], (req, res) => {
 // ---------------------- License Validation Endpoint ----------------------
 // Called by Minecraft Paper/Velocity plugins
 app.post('/api/license/validate', (req, res) => {
-  const { license_key, product, server_ip, port } = req.body;
+  const { license_key, api_key, product, server_ip, port } = req.body;
   const clientIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress || server_ip;
+
+  const providedApiKey = req.headers['x-api-key'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '').trim() || api_key;
+  if (CLIENT_API_KEY && providedApiKey !== CLIENT_API_KEY && providedApiKey !== ADMIN_SECRET) {
+    logValidation({ key: license_key || 'UNKNOWN', valid: false, reason: 'Invalid or missing API key', ip: clientIp, product });
+    return res.status(401).json({
+      valid: false,
+      status: 'UNAUTHORIZED_API_KEY',
+      message: 'Invalid or missing API key. Set api-key in plugin config.'
+    });
+  }
 
   if (!license_key || typeof license_key !== 'string') {
     logValidation({ key: 'EMPTY', valid: false, reason: 'Missing license key', ip: clientIp, product });
