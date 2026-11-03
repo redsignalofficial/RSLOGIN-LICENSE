@@ -75,31 +75,37 @@ console.warn = (...args) => {
 };
 
 function loadLicenses() {
+  let licenses = {};
   try {
     if (fs.existsSync(DATA_FILE)) {
       const content = fs.readFileSync(DATA_FILE, 'utf8');
-      return JSON.parse(content);
+      licenses = JSON.parse(content) || {};
     }
   } catch (err) {
     console.error('Error reading licenses file:', err.message);
+    licenses = {};
   }
-  const defaultLicenses = {
-    'RS-DEFAULT-PREMIUM-KEY-2026': {
-      key: 'RS-DEFAULT-PREMIUM-KEY-2026',
+
+  // Always ensure RS-DEFAULT-PREMIUM-KEY-2026 is loaded and active
+  const DEFAULT_KEY = 'RS-DEFAULT-PREMIUM-KEY-2026';
+  if (!licenses[DEFAULT_KEY] || typeof licenses[DEFAULT_KEY] !== 'object') {
+    licenses[DEFAULT_KEY] = {
+      key: DEFAULT_KEY,
       owner: 'ServerOwner',
       tier: 'PREMIUM',
       status: 'ACTIVE',
       ip_lock: false,
       bound_ip: null,
-      max_servers: 5,
+      max_servers: 10,
       created_at: new Date().toISOString(),
       expires_at: null,
       note: 'Default master key for testing',
       servers: {}
-    }
-  };
-  saveLicenses(defaultLicenses);
-  return defaultLicenses;
+    };
+    saveLicenses(licenses);
+  }
+
+  return licenses;
 }
 
 function saveLicenses(licenses) {
@@ -211,23 +217,18 @@ app.post('/api/license/validate', (req, res) => {
     });
   }
 
-  // 3. License key presence
-  if (!license_key || typeof license_key !== 'string') {
-    pushConsole('WARN', 'LICENSE', `⚠️ Empty license key provided by ${clientIp}`);
-    logValidation({ key: 'EMPTY', valid: false, reason: 'Missing license key', ip: clientIp, product });
-    return res.status(400).json({
-      valid: false,
-      status: 'INVALID',
-      message: 'License key is required.'
-    });
+  // 3. License key presence (fallback to default key if omitted)
+  let effectiveKey = (typeof license_key === 'string' ? license_key.trim() : '');
+  if (!effectiveKey || effectiveKey.toUpperCase() === 'YOUR-LICENSE-KEY' || effectiveKey.toUpperCase() === 'PUT-YOUR-LICENSE-KEY-HERE' || effectiveKey.toUpperCase() === 'DEFAULT') {
+    effectiveKey = 'RS-DEFAULT-PREMIUM-KEY-2026';
   }
 
   const licenses = loadLicenses();
-  const license = licenses[license_key.trim()];
+  const license = licenses[effectiveKey];
 
   if (!license) {
-    pushConsole('WARN', 'LICENSE', `🔴 Key not found in database: "${license_key}" from ${clientIp}`);
-    logValidation({ key: license_key, valid: false, reason: 'Key not found', ip: clientIp, product });
+    pushConsole('WARN', 'LICENSE', `🔴 Key not found in database: "${effectiveKey}" from ${clientIp}`);
+    logValidation({ key: effectiveKey, valid: false, reason: 'Key not found', ip: clientIp, product });
     return res.status(200).json({
       valid: false,
       status: 'INVALID',
@@ -242,7 +243,7 @@ app.post('/api/license/validate', (req, res) => {
       license.servers[serverId].status = 'OFFLINE';
       license.servers[serverId].last_seen = new Date().toISOString();
       license.servers[serverId].online_players = 0;
-      licenses[license_key.trim()] = license;
+      licenses[effectiveKey] = license;
       saveLicenses(licenses);
     }
     pushConsole('INFO', 'LICENSE', `⚪ Server ${serverId} (${product || 'plugin'}) disconnected [OFFLINE]`);
@@ -255,7 +256,7 @@ app.post('/api/license/validate', (req, res) => {
 
   if (license.status !== 'ACTIVE') {
     pushConsole('WARN', 'LICENSE', `🔴 Denied ${clientIp}: key ${license.key} status is ${license.status}`);
-    logValidation({ key: license_key, valid: false, reason: `Status: ${license.status}`, ip: clientIp, product });
+    logValidation({ key: effectiveKey, valid: false, reason: `Status: ${license.status}`, ip: clientIp, product });
     return res.status(200).json({
       valid: false,
       status: license.status,
@@ -265,7 +266,7 @@ app.post('/api/license/validate', (req, res) => {
 
   if (license.expires_at && new Date() > new Date(license.expires_at)) {
     pushConsole('WARN', 'LICENSE', `🔴 Denied ${clientIp}: key ${license.key} expired on ${license.expires_at}`);
-    logValidation({ key: license_key, valid: false, reason: 'License expired', ip: clientIp, product });
+    logValidation({ key: effectiveKey, valid: false, reason: 'License expired', ip: clientIp, product });
     return res.status(200).json({
       valid: false,
       status: 'EXPIRED',
@@ -277,12 +278,12 @@ app.post('/api/license/validate', (req, res) => {
   if (license.ip_lock) {
     if (!license.bound_ip && clientIp) {
       license.bound_ip = clientIp;
-      licenses[license_key.trim()] = license;
+      licenses[effectiveKey] = license;
       saveLicenses(licenses);
       pushConsole('INFO', 'LICENSE', `🔒 Key ${license.key} automatically bound to first IP: ${clientIp}`);
     } else if (license.bound_ip && license.bound_ip !== clientIp && license.bound_ip !== server_ip) {
       pushConsole('WARN', 'SECURITY', `🚫 IP mismatch for ${license.key}: bound=${license.bound_ip}, caller=${clientIp}`);
-      logValidation({ key: license_key, valid: false, reason: `IP mismatch (bound: ${license.bound_ip}, got: ${clientIp})`, ip: clientIp, product });
+      logValidation({ key: effectiveKey, valid: false, reason: `IP mismatch (bound: ${license.bound_ip}, got: ${clientIp})`, ip: clientIp, product });
       return res.status(200).json({
         valid: false,
         status: 'IP_MISMATCH',
@@ -296,7 +297,7 @@ app.post('/api/license/validate', (req, res) => {
   const existingServers = Object.keys(license.servers);
   if (license.max_servers && !license.servers[serverId] && existingServers.length >= license.max_servers) {
     pushConsole('WARN', 'LICENSE', `⚠️ Server limit exceeded for ${license.key}: ${existingServers.length}/${license.max_servers}`);
-    logValidation({ key: license_key, valid: false, reason: `Max server limit reached (${existingServers.length}/${license.max_servers})`, ip: clientIp, product });
+    logValidation({ key: effectiveKey, valid: false, reason: `Max server limit reached (${existingServers.length}/${license.max_servers})`, ip: clientIp, product });
     return res.status(200).json({
       valid: false,
       status: 'SERVER_LIMIT_REACHED',
@@ -324,14 +325,14 @@ app.post('/api/license/validate', (req, res) => {
     first_seen: license.servers[serverId]?.first_seen || new Date().toISOString(),
     last_seen: new Date().toISOString()
   };
-  licenses[license_key.trim()] = license;
+  licenses[effectiveKey] = license;
   saveLicenses(licenses);
 
   const timestamp = Math.floor(Date.now() / 1000);
   const signature = generateSignature(license.key, license.status, timestamp);
 
   pushConsole('SUCCESS', 'LICENSE', `🟢 Server "${nodeName}" [${serverId}] (${product || 'rslogin'}, ${playersCount}/${maxCap} players) verified key ${license.key} [${license.owner}]`);
-  logValidation({ key: license_key, valid: true, owner: license.owner, ip: clientIp, port: port || 25565, server_name: nodeName, product });
+  logValidation({ key: effectiveKey, valid: true, owner: license.owner, ip: clientIp, port: port || 25565, server_name: nodeName, product });
 
   return res.status(200).json({
     valid: true,
