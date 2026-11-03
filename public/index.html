@@ -158,24 +158,24 @@
         </div>
 
         <!-- Navigation Tabs -->
-        <nav class="hidden md:flex items-center gap-1 bg-[#1F1F1F] p-1 rounded-xl border border-[#272727]">
-          <button onclick="switchTab('overview')" id="nav-overview" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[#272727] transition-all flex items-center gap-1.5">
+        <nav class="flex items-center gap-1 bg-[#1F1F1F] p-1 rounded-xl border border-[#272727] overflow-x-auto max-w-[calc(100vw-170px)] md:max-w-none scrollbar-none whitespace-nowrap">
+          <button onclick="switchTab('overview')" id="nav-overview" class="tab-btn shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[#272727] transition-all flex items-center gap-1.5">
             <i class="ph-bold ph-chart-pie text-zinc-400"></i> Overview
           </button>
-          <button onclick="switchTab('licenses')" id="nav-licenses" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-1.5">
+          <button onclick="switchTab('licenses')" id="nav-licenses" class="tab-btn shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-1.5">
             <i class="ph-bold ph-key"></i> Licenses
           </button>
-          <button onclick="switchTab('servers')" id="nav-servers" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-1.5">
+          <button onclick="switchTab('servers')" id="nav-servers" class="tab-btn shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-1.5">
             <i class="ph-bold ph-server"></i> Servers
           </button>
-          <button onclick="switchTab('console')" id="nav-console" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-1.5 relative">
+          <button onclick="switchTab('console')" id="nav-console" class="tab-btn shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-1.5 relative">
             <i class="ph-bold ph-terminal text-emerald-400"></i> Console
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
           </button>
-          <button onclick="switchTab('banned')" id="nav-banned" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-1.5">
+          <button onclick="switchTab('banned')" id="nav-banned" class="tab-btn shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-1.5">
             <i class="ph-bold ph-prohibit text-red-400"></i> Banned IPs
           </button>
-          <button onclick="switchTab('logs')" id="nav-logs" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-1.5">
+          <button onclick="switchTab('logs')" id="nav-logs" class="tab-btn shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-1.5">
             <i class="ph-bold ph-clipboard-text"></i> Audit Logs
           </button>
         </nav>
@@ -220,15 +220,18 @@
             <div class="text-xs text-zinc-500 mt-1">Authorized for server boot</div>
           </div>
 
-          <div class="surface-card rounded-2xl p-5 shadow-lg">
+          <div onclick="switchTab('servers')" class="surface-card rounded-2xl p-5 shadow-lg cursor-pointer hover:border-purple-500/40 transition-all group">
             <div class="flex items-center justify-between mb-3">
-              <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Connected Servers</span>
+              <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400 group-hover:text-purple-300 transition-colors">Connected Servers</span>
               <div class="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center border border-purple-500/20">
                 <i class="ph-bold ph-server text-base"></i>
               </div>
             </div>
             <div id="stat-servers" class="text-3xl font-bold font-mono text-purple-400 tracking-tight">0</div>
-            <div class="text-xs text-zinc-500 mt-1">Active Minecraft server nodes</div>
+            <div class="text-xs text-zinc-500 mt-1 flex items-center gap-1">
+              <span>View server nodes</span>
+              <i class="ph-bold ph-arrow-right text-[10px] text-purple-400"></i>
+            </div>
           </div>
 
           <div class="surface-card rounded-2xl p-5 shadow-lg">
@@ -260,6 +263,39 @@
             <button onclick="openCreateModal()" class="shrink-0 bg-brand hover:bg-brand-hover text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-1.5">
               <i class="ph-bold ph-plus text-sm"></i> Generate License
             </button>
+          </div>
+        </div>
+
+        <!-- Active Minecraft Server Nodes on Overview -->
+        <div class="surface-card rounded-2xl overflow-hidden shadow-xl">
+          <div class="px-6 py-4 border-b border-[#272727] flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i class="ph-bold ph-server text-purple-400 text-base"></i> Active Minecraft Server Nodes
+              </h3>
+              <p class="text-xs text-zinc-400">Live servers currently running RSLogin, displaying online status, players, and core version.</p>
+            </div>
+            <button onclick="switchTab('servers')" class="text-xs text-brand hover:text-red-400 font-semibold flex items-center gap-1">
+              <span>Full Servers View</span> <i class="ph-bold ph-arrow-right text-xs"></i>
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-[#1F1F1F]/60 text-zinc-400 uppercase tracking-wider font-semibold border-b border-[#272727]">
+                <tr>
+                  <th class="px-6 py-3.5">Status</th>
+                  <th class="px-6 py-3.5">Server / MOTD</th>
+                  <th class="px-6 py-3.5">Players</th>
+                  <th class="px-6 py-3.5">Platform & Version</th>
+                  <th class="px-6 py-3.5">Address</th>
+                  <th class="px-6 py-3.5">License Key & Owner</th>
+                  <th class="px-6 py-3.5">Last Seen</th>
+                </tr>
+              </thead>
+              <tbody id="overview-servers-table-body" class="divide-y divide-[#272727]/60 text-zinc-300">
+                <tr><td colspan="7" class="px-6 py-8 text-center text-zinc-500">No servers running currently.</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -347,16 +383,18 @@
             <table class="w-full text-left text-xs">
               <thead class="bg-[#1F1F1F]/60 text-zinc-400 uppercase tracking-wider font-semibold border-b border-[#272727]">
                 <tr>
-                  <th class="px-6 py-3.5">Server Address (IP:Port)</th>
-                  <th class="px-6 py-3.5">License Key</th>
-                  <th class="px-6 py-3.5">Owner</th>
-                  <th class="px-6 py-3.5">Platform</th>
-                  <th class="px-6 py-3.5">Last Ping</th>
-                  <th class="px-6 py-3.5 text-right">Manage Server</th>
+                  <th class="px-6 py-3.5">Status</th>
+                  <th class="px-6 py-3.5">Server / MOTD</th>
+                  <th class="px-6 py-3.5">Players</th>
+                  <th class="px-6 py-3.5">Platform & Version</th>
+                  <th class="px-6 py-3.5">Address / Port</th>
+                  <th class="px-6 py-3.5">License & Owner</th>
+                  <th class="px-6 py-3.5">Last Heartbeat</th>
+                  <th class="px-6 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody id="all-servers-table-body" class="divide-y divide-[#272727]/60 text-zinc-300">
-                <tr><td colspan="6" class="px-6 py-8 text-center text-zinc-500">No servers connected yet.</td></tr>
+                <tr><td colspan="8" class="px-6 py-8 text-center text-zinc-500">No servers connected yet.</td></tr>
               </tbody>
             </table>
           </div>
@@ -580,8 +618,10 @@
         <table class="w-full text-left text-xs">
           <thead class="bg-[#1F1F1F] text-zinc-400 uppercase tracking-wider font-semibold border-b border-[#272727]">
             <tr>
-              <th class="px-4 py-2.5">Server IP</th>
-              <th class="px-4 py-2.5">Port</th>
+              <th class="px-4 py-2.5">Status</th>
+              <th class="px-4 py-2.5">Server / MOTD</th>
+              <th class="px-4 py-2.5">Players</th>
+              <th class="px-4 py-2.5">Address</th>
               <th class="px-4 py-2.5">Platform</th>
               <th class="px-4 py-2.5">Last Seen</th>
               <th class="px-4 py-2.5 text-right">Actions</th>
@@ -722,12 +762,18 @@
       }
     }
 
+    let autoRefreshInterval = null;
+
     function handleLogout() {
       token = '';
       localStorage.removeItem('rslogin_admin_token');
       if (sseSource) {
         sseSource.close();
         sseSource = null;
+      }
+      if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
       }
       showLogin();
       showToast('Logged out.');
@@ -743,6 +789,9 @@
       document.getElementById('dashboard-view').classList.remove('hidden');
       refreshData();
       initConsoleStream();
+      if (!autoRefreshInterval) {
+        autoRefreshInterval = setInterval(refreshData, 10000);
+      }
     }
 
     function switchTab(tab) {
@@ -938,8 +987,32 @@
       }).join('');
     }
 
+    function formatRelativeTime(isoString) {
+      if (!isoString) return '—';
+      const diffSec = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
+      if (diffSec < 5) return 'Just now';
+      if (diffSec < 60) return `${diffSec}s ago`;
+      const diffMin = Math.floor(diffSec / 60);
+      if (diffMin < 60) return `${diffMin}m ago`;
+      const diffHr = Math.floor(diffMin / 60);
+      if (diffHr < 24) return `${diffHr}h ago`;
+      return new Date(isoString).toLocaleDateString();
+    }
+
+    function getServerStatusBadge(srv) {
+      const status = srv.status || 'ONLINE';
+      if (status === 'ONLINE') {
+        return `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> ONLINE</span>`;
+      }
+      if (status === 'AWAY') {
+        return `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono"><span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> AWAY</span>`;
+      }
+      return `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-800 text-zinc-500 border border-zinc-700 font-mono">OFFLINE</span>`;
+    }
+
     function renderAllServers() {
       const tbody = document.getElementById('all-servers-table-body');
+      const overviewTbody = document.getElementById('overview-servers-table-body');
       const serverList = [];
 
       globalLicenses.forEach(lic => {
@@ -954,34 +1027,103 @@
         }
       });
 
-      if (serverList.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-zinc-500">No servers connected yet.</td></tr>';
-        return;
+      // Sort: ONLINE first, then most recently active
+      serverList.sort((a, b) => {
+        if (a.status === 'ONLINE' && b.status !== 'ONLINE') return -1;
+        if (b.status === 'ONLINE' && a.status !== 'ONLINE') return 1;
+        return new Date(b.last_seen || 0) - new Date(a.last_seen || 0);
+      });
+
+      // Render Overview Tab Servers
+      if (overviewTbody) {
+        if (serverList.length === 0) {
+          overviewTbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-zinc-500">No servers running currently. Launch your Minecraft server with RSLogin to see it appear live.</td></tr>';
+        } else {
+          overviewTbody.innerHTML = serverList.slice(0, 10).map(srv => {
+            const relTime = formatRelativeTime(srv.last_seen);
+            const statusBadge = getServerStatusBadge(srv);
+            const serverTitle = escapeHtml(srv.server_name || srv.motd || 'Minecraft Server');
+            const motdText = (srv.motd && srv.motd !== srv.server_name) ? `<div class="text-[11px] text-zinc-500 font-mono truncate max-w-xs">${escapeHtml(srv.motd)}</div>` : '';
+
+            return `
+              <tr class="hover:bg-[#1F1F1F]/60 transition-colors">
+                <td class="px-6 py-3.5">${statusBadge}</td>
+                <td class="px-6 py-3.5">
+                  <div class="font-bold text-white text-xs">${serverTitle}</div>
+                  ${motdText}
+                </td>
+                <td class="px-6 py-3.5">
+                  <span class="inline-flex items-center gap-1 font-mono text-xs text-purple-300">
+                    <i class="ph-bold ph-users text-xs text-purple-400"></i>
+                    ${srv.online_players || 0} / ${srv.max_players || 0}
+                  </span>
+                </td>
+                <td class="px-6 py-3.5">
+                  <div class="text-xs text-zinc-200 font-medium">${escapeHtml(srv.product || 'plugin')}</div>
+                  <div class="text-[10px] text-zinc-500 font-mono">${escapeHtml(srv.server_version || 'Unknown')}</div>
+                </td>
+                <td class="px-6 py-3.5 font-mono text-zinc-300 text-xs">${srv.ip}:${srv.port || 25565}</td>
+                <td class="px-6 py-3.5">
+                  <div class="font-mono text-xs text-white">${srv.license_key}</div>
+                  <div class="text-[11px] text-zinc-400">${escapeHtml(srv.owner || '—')}</div>
+                </td>
+                <td class="px-6 py-3.5 text-zinc-300 font-mono text-xs" title="${srv.last_seen || ''}">${relTime}</td>
+              </tr>
+            `;
+          }).join('');
+        }
       }
 
-      tbody.innerHTML = serverList.map(srv => {
-        const lastSeenDate = srv.last_seen ? new Date(srv.last_seen) : null;
-        
-        return `
-          <tr class="hover:bg-[#1F1F1F]/60">
-            <td class="px-6 py-3.5 font-mono text-white font-medium">${srv.ip}:${srv.port || 25565}</td>
-            <td class="px-6 py-3.5 font-mono text-zinc-400 text-[11px]">${srv.license_key}</td>
-            <td class="px-6 py-3.5 text-zinc-300">${escapeHtml(srv.owner || '—')}</td>
-            <td class="px-6 py-3.5"><span class="px-2 py-0.5 rounded bg-[#1F1F1F] text-zinc-300 text-[10px] font-mono border border-[#272727]">${srv.product}</span></td>
-            <td class="px-6 py-3.5 text-zinc-300 font-mono text-[11px]">${lastSeenDate ? lastSeenDate.toLocaleTimeString() : '—'}</td>
-            <td class="px-6 py-3.5 text-right space-x-2">
-              <button onclick="removeServerConnection('${srv.license_key}', '${srv.id}')" title="Disconnect Server"
-                class="px-2.5 py-1 rounded-lg text-xs bg-[#1F1F1F] hover:bg-[#272727] text-zinc-300 hover:text-white transition-all border border-[#272727]">
-                <i class="ph-bold ph-link-break text-xs text-amber-400"></i> Disconnect
-              </button>
-              <button onclick="promptBanIp('${srv.ip}')" title="Ban Server IP"
-                class="px-2.5 py-1 rounded-lg text-xs bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-500/20 transition-all">
-                <i class="ph-bold ph-prohibit text-xs"></i> Ban IP
-              </button>
-            </td>
-          </tr>
-        `;
-      }).join('');
+      // Render Servers Tab Servers
+      if (tbody) {
+        if (serverList.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-8 text-center text-zinc-500">No servers connected yet.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = serverList.map(srv => {
+          const relTime = formatRelativeTime(srv.last_seen);
+          const statusBadge = getServerStatusBadge(srv);
+          const serverTitle = escapeHtml(srv.server_name || srv.motd || 'Minecraft Server');
+          const motdText = (srv.motd && srv.motd !== srv.server_name) ? `<div class="text-[11px] text-zinc-500 font-mono truncate max-w-xs">${escapeHtml(srv.motd)}</div>` : '';
+
+          return `
+            <tr class="hover:bg-[#1F1F1F]/60 transition-colors">
+              <td class="px-6 py-3.5">${statusBadge}</td>
+              <td class="px-6 py-3.5">
+                <div class="font-bold text-white text-xs">${serverTitle}</div>
+                ${motdText}
+              </td>
+              <td class="px-6 py-3.5">
+                <span class="inline-flex items-center gap-1 font-mono text-xs text-purple-300">
+                  <i class="ph-bold ph-users text-xs text-purple-400"></i>
+                  ${srv.online_players || 0} / ${srv.max_players || 0}
+                </span>
+              </td>
+              <td class="px-6 py-3.5">
+                <div class="text-xs text-zinc-200 font-medium">${escapeHtml(srv.product || 'plugin')}</div>
+                <div class="text-[10px] text-zinc-500 font-mono">${escapeHtml(srv.server_version || 'Unknown')}</div>
+              </td>
+              <td class="px-6 py-3.5 font-mono text-zinc-300 text-xs">${srv.ip}:${srv.port || 25565}</td>
+              <td class="px-6 py-3.5">
+                <div class="font-mono text-xs text-white">${srv.license_key}</div>
+                <div class="text-[11px] text-zinc-400">${escapeHtml(srv.owner || '—')}</div>
+              </td>
+              <td class="px-6 py-3.5 text-zinc-300 font-mono text-xs" title="${srv.last_seen || ''}">${relTime}</td>
+              <td class="px-6 py-3.5 text-right space-x-2">
+                <button onclick="removeServerConnection('${srv.license_key}', '${srv.id}')" title="Disconnect Server"
+                  class="px-2.5 py-1 rounded-lg text-xs bg-[#1F1F1F] hover:bg-[#272727] text-zinc-300 hover:text-white transition-all border border-[#272727]">
+                  <i class="ph-bold ph-link-break text-xs text-amber-400"></i> Disconnect
+                </button>
+                <button onclick="promptBanIp('${srv.ip}')" title="Ban Server IP"
+                  class="px-2.5 py-1 rounded-lg text-xs bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-500/20 transition-all">
+                  <i class="ph-bold ph-prohibit text-xs"></i> Ban IP
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
     }
 
     function renderBannedIpsTable() {
@@ -1058,6 +1200,9 @@
         try {
           const entry = JSON.parse(event.data);
           appendConsoleEntry(entry);
+          if (entry.tag === 'LICENSE') {
+            refreshData();
+          }
         } catch (e) {}
       };
 
@@ -1307,24 +1452,35 @@
 
       const servers = lic.servers ? Object.values(lic.servers) : [];
       if (servers.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-zinc-500">No servers have connected with this key yet.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-center text-zinc-500">No servers have connected with this key yet.</td></tr>';
       } else {
-        tbody.innerHTML = servers.map(srv => `
-          <tr class="hover:bg-[#1F1F1F]/60">
-            <td class="px-4 py-2.5 font-mono text-white font-medium">${srv.ip}</td>
-            <td class="px-4 py-2.5 font-mono text-zinc-400">${srv.port || 25565}</td>
-            <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded bg-[#1F1F1F] text-zinc-300 text-[10px] font-mono border border-[#272727]">${srv.product || 'plugin'}</span></td>
-            <td class="px-4 py-2.5 text-zinc-300 font-mono text-[11px]">${srv.last_seen ? new Date(srv.last_seen).toLocaleTimeString() : '—'}</td>
-            <td class="px-4 py-2.5 text-right space-x-1.5">
-              <button onclick="removeServerConnection('${key}', '${srv.id}')" title="Disconnect Server" class="text-xs text-amber-400 hover:text-amber-300 font-medium">
-                <i class="ph-bold ph-link-break"></i> Remove
-              </button>
-              <button onclick="promptBanIp('${srv.ip}')" title="Ban Server IP" class="text-xs text-red-400 hover:text-red-300 font-medium ml-2">
-                <i class="ph-bold ph-prohibit"></i> Ban
-              </button>
-            </td>
-          </tr>
-        `).join('');
+        tbody.innerHTML = servers.map(srv => {
+          const statusBadge = getServerStatusBadge(srv);
+          const relTime = formatRelativeTime(srv.last_seen);
+          const serverTitle = escapeHtml(srv.server_name || srv.motd || 'Minecraft Server');
+
+          return `
+            <tr class="hover:bg-[#1F1F1F]/60">
+              <td class="px-4 py-2.5">${statusBadge}</td>
+              <td class="px-4 py-2.5">
+                <div class="font-bold text-white text-xs">${serverTitle}</div>
+                ${srv.motd && srv.motd !== srv.server_name ? `<div class="text-[10px] text-zinc-500 font-mono">${escapeHtml(srv.motd)}</div>` : ''}
+              </td>
+              <td class="px-4 py-2.5 font-mono text-purple-300 text-xs">${srv.online_players || 0} / ${srv.max_players || 0}</td>
+              <td class="px-4 py-2.5 font-mono text-white text-xs">${srv.ip}:${srv.port || 25565}</td>
+              <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded bg-[#1F1F1F] text-zinc-300 text-[10px] font-mono border border-[#272727]">${srv.product || 'plugin'}</span></td>
+              <td class="px-4 py-2.5 text-zinc-300 font-mono text-[11px]" title="${srv.last_seen || ''}">${relTime}</td>
+              <td class="px-4 py-2.5 text-right space-x-1.5">
+                <button onclick="removeServerConnection('${key}', '${srv.id}')" title="Disconnect Server" class="text-xs text-amber-400 hover:text-amber-300 font-medium">
+                  <i class="ph-bold ph-link-break"></i> Remove
+                </button>
+                <button onclick="promptBanIp('${srv.ip}')" title="Ban Server IP" class="text-xs text-red-400 hover:text-red-300 font-medium ml-2">
+                  <i class="ph-bold ph-prohibit"></i> Ban
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
       }
 
       document.getElementById('modal-key-servers').classList.remove('hidden');

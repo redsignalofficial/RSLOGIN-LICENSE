@@ -8,7 +8,11 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 10000;
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'rslogin-admin-secret-change-me';
-const CLIENT_API_KEY = process.env.CLIENT_API_KEY || 'rslogin-api-key-2026';
+const CLIENT_API_KEYS = new Set([
+  process.env.CLIENT_API_KEY,
+  'EVQS9VAHQYZ47CHVNVQ8JFB',
+  'rslogin-api-key-2026'
+].filter(Boolean));
 const SECRET_SIGN_KEY = process.env.SECRET_SIGN_KEY || 'rslogin-sign-key-2026';
 const DATA_FILE = path.join(__dirname, 'data', 'licenses.json');
 const LOGS_FILE = path.join(__dirname, 'data', 'logs.json');
@@ -167,7 +171,19 @@ app.get('/health', (req, res) => {
 // ---------------------- License Validation Endpoint ----------------------
 // Called by Minecraft Paper/Velocity plugins
 app.post('/api/license/validate', (req, res) => {
-  const { license_key, api_key, product, server_ip, port } = req.body;
+  const {
+    license_key,
+    api_key,
+    product,
+    server_ip,
+    port,
+    server_name,
+    server_version,
+    motd,
+    online_players,
+    max_players,
+    status
+  } = req.body;
   const clientIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress || server_ip;
 
   // 1. IP Ban check
@@ -185,7 +201,7 @@ app.post('/api/license/validate', (req, res) => {
 
   // 2. API Key authentication check
   const providedApiKey = req.headers['x-api-key'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '').trim() || api_key;
-  if (CLIENT_API_KEY && providedApiKey !== CLIENT_API_KEY && providedApiKey !== ADMIN_SECRET) {
+  if (!CLIENT_API_KEYS.has(providedApiKey) && providedApiKey !== ADMIN_SECRET) {
     pushConsole('WARN', 'SECURITY', `⚠️ Unauthorized API key attempt from ${clientIp} (Product: ${product || 'unknown'})`);
     logValidation({ key: license_key || 'UNKNOWN', valid: false, reason: 'Invalid or missing API key', ip: clientIp, product });
     return res.status(401).json({
@@ -216,6 +232,24 @@ app.post('/api/license/validate', (req, res) => {
       valid: false,
       status: 'INVALID',
       message: 'License key does not exist or was revoked.'
+    });
+  }
+
+  // Handle graceful shutdown notice
+  const serverId = `${clientIp}:${port || 25565}`;
+  if (status === 'OFFLINE') {
+    if (license.servers && license.servers[serverId]) {
+      license.servers[serverId].status = 'OFFLINE';
+      license.servers[serverId].last_seen = new Date().toISOString();
+      license.servers[serverId].online_players = 0;
+      licenses[license_key.trim()] = license;
+      saveLicenses(licenses);
+    }
+    pushConsole('INFO', 'LICENSE', `⚪ Server ${serverId} (${product || 'plugin'}) disconnected [OFFLINE]`);
+    return res.status(200).json({
+      valid: true,
+      status: 'OFFLINE',
+      message: 'Server node recorded as offline.'
     });
   }
 
@@ -259,7 +293,6 @@ app.post('/api/license/validate', (req, res) => {
 
   // 5. Server Count Limit check
   if (!license.servers) license.servers = {};
-  const serverId = `${clientIp}:${port || 25565}`;
   const existingServers = Object.keys(license.servers);
   if (license.max_servers && !license.servers[serverId] && existingServers.length >= license.max_servers) {
     pushConsole('WARN', 'LICENSE', `⚠️ Server limit exceeded for ${license.key}: ${existingServers.length}/${license.max_servers}`);
@@ -271,12 +304,23 @@ app.post('/api/license/validate', (req, res) => {
     });
   }
 
+  const nodeName = (server_name && server_name.trim()) ? server_name.trim() : (motd && motd.trim() ? motd.trim() : 'Minecraft Server');
+  const nodeVersion = (server_version && server_version.trim()) ? server_version.trim() : 'Unknown';
+  const playersCount = (typeof online_players === 'number') ? Math.max(0, online_players) : (license.servers[serverId]?.online_players || 0);
+  const maxCap = (typeof max_players === 'number') ? Math.max(0, max_players) : (license.servers[serverId]?.max_players || 0);
+
   // 6. Record connected server
   license.servers[serverId] = {
     id: serverId,
     ip: clientIp,
     port: port || 25565,
     product: product || 'rslogin',
+    server_name: nodeName,
+    server_version: nodeVersion,
+    motd: motd || '',
+    online_players: playersCount,
+    max_players: maxCap,
+    status: 'ONLINE',
     first_seen: license.servers[serverId]?.first_seen || new Date().toISOString(),
     last_seen: new Date().toISOString()
   };
@@ -286,8 +330,8 @@ app.post('/api/license/validate', (req, res) => {
   const timestamp = Math.floor(Date.now() / 1000);
   const signature = generateSignature(license.key, license.status, timestamp);
 
-  pushConsole('SUCCESS', 'LICENSE', `🟢 Server ${serverId} (${product || 'rslogin'}) validated key ${license.key} [${license.owner}]`);
-  logValidation({ key: license_key, valid: true, owner: license.owner, ip: clientIp, product });
+  pushConsole('SUCCESS', 'LICENSE', `🟢 Server "${nodeName}" [${serverId}] (${product || 'rslogin'}, ${playersCount}/${maxCap} players) verified key ${license.key} [${license.owner}]`);
+  logValidation({ key: license_key, valid: true, owner: license.owner, ip: clientIp, port: port || 25565, server_name: nodeName, product });
 
   return res.status(200).json({
     valid: true,
@@ -612,6 +656,22 @@ app.delete('/api/admin/console/logs', requireAdmin, (req, res) => {
 // List all licenses
 app.get('/api/admin/licenses', requireAdmin, (req, res) => {
   const licenses = loadLicenses();
+  const now = Date.now();
+  for (const lic of Object.values(licenses)) {
+    if (lic.servers) {
+      for (const srv of Object.values(lic.servers)) {
+        if (srv.status === 'OFFLINE') continue;
+        const diffMs = now - new Date(srv.last_seen).getTime();
+        if (diffMs > 5 * 60 * 1000) {
+          srv.status = 'OFFLINE';
+        } else if (diffMs > 2.5 * 60 * 1000) {
+          srv.status = 'AWAY';
+        } else {
+          srv.status = 'ONLINE';
+        }
+      }
+    }
+  }
   res.json({
     count: Object.keys(licenses).length,
     licenses: Object.values(licenses)
