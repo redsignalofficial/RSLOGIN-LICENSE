@@ -15,6 +15,7 @@ const LOGS_FILE = path.join(__dirname, 'data', 'logs.json');
 
 app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Ensure data folder and files exist
 if (!fs.existsSync(path.join(__dirname, 'data'))) {
@@ -170,6 +171,20 @@ app.post('/api/license/validate', (req, res) => {
 
   const timestamp = Math.floor(Date.now() / 1000);
   const signature = generateSignature(license.key, license.status, timestamp);
+
+  // Track connected server instance for this key
+  if (!license.servers) license.servers = {};
+  const serverId = `${clientIp}:${port || 25565}`;
+  license.servers[serverId] = {
+    id: serverId,
+    ip: clientIp,
+    port: port || 25565,
+    product: product || 'rslogin',
+    first_seen: license.servers[serverId]?.first_seen || new Date().toISOString(),
+    last_seen: new Date().toISOString()
+  };
+  licenses[license_key.trim()] = license;
+  saveLicenses(licenses);
 
   logValidation({ key: license_key, valid: true, owner: license.owner, ip: clientIp, product });
 
