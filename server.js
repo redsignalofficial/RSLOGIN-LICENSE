@@ -1005,8 +1005,8 @@ app.post('/api/admin/licenses', requireAdmin, (req, res) => {
   });
 });
 
-// Update license
-app.put('/api/admin/licenses/:key', requireAdmin, (req, res) => {
+// Update license info (supports renaming key and editing all properties)
+function handleUpdateLicense(req, res) {
   const licenses = loadLicenses();
   const key = req.params.key;
 
@@ -1014,26 +1014,47 @@ app.put('/api/admin/licenses/:key', requireAdmin, (req, res) => {
     return res.status(404).json({ error: 'License not found' });
   }
 
-  const { status, owner, tier, max_servers, ip_lock, bound_ip, expires_at, note } = req.body;
-  if (status) licenses[key].status = status;
-  if (owner) licenses[key].owner = owner;
-  if (tier) licenses[key].tier = tier;
-  if (max_servers !== undefined) licenses[key].max_servers = Number(max_servers);
-  if (ip_lock !== undefined) licenses[key].ip_lock = Boolean(ip_lock);
-  if (bound_ip !== undefined) licenses[key].bound_ip = bound_ip;
-  if (expires_at !== undefined) licenses[key].expires_at = expires_at;
-  if (note !== undefined) licenses[key].note = note;
+  const { new_key, status, owner, tier, max_servers, ip_lock, bound_ip, expires_at, note } = req.body || {};
+  let targetKey = key;
 
-  licenses[key].updated_at = new Date().toISOString();
+  // Handle key renaming if requested
+  if (new_key && typeof new_key === 'string' && new_key.trim() !== key) {
+    const cleanNewKey = new_key.trim();
+    if (!/^[A-Za-z0-9\-_]{3,64}$/.test(cleanNewKey)) {
+      return res.status(400).json({ error: 'New license key must be 3-64 alphanumeric characters, dashes, or underscores' });
+    }
+    if (licenses[cleanNewKey]) {
+      return res.status(409).json({ error: `License key "${cleanNewKey}" already exists` });
+    }
+    licenses[cleanNewKey] = licenses[key];
+    delete licenses[key];
+    licenses[cleanNewKey].key = cleanNewKey;
+    targetKey = cleanNewKey;
+    pushConsole('WARN', 'ADMIN', `🔑 License key renamed: "${key}" ➔ "${cleanNewKey}"`);
+  }
+
+  if (status) licenses[targetKey].status = status;
+  if (owner !== undefined) licenses[targetKey].owner = String(owner || '').trim().slice(0, 100);
+  if (tier !== undefined) licenses[targetKey].tier = String(tier || 'STANDARD').trim().toUpperCase().slice(0, 30);
+  if (max_servers !== undefined) licenses[targetKey].max_servers = Math.max(1, Math.min(100, Number(max_servers) || 3));
+  if (ip_lock !== undefined) licenses[targetKey].ip_lock = Boolean(ip_lock);
+  if (bound_ip !== undefined) licenses[targetKey].bound_ip = bound_ip ? String(bound_ip).trim().slice(0, 60) : null;
+  if (expires_at !== undefined) licenses[targetKey].expires_at = expires_at ? new Date(expires_at).toISOString() : null;
+  if (note !== undefined) licenses[targetKey].note = String(note || '').trim().slice(0, 255);
+
+  licenses[targetKey].updated_at = new Date().toISOString();
   saveLicenses(licenses);
 
-  pushConsole('INFO', 'ADMIN', `✏️ License ${key} updated (Status: ${licenses[key].status})`);
+  pushConsole('INFO', 'ADMIN', `✏️ License ${targetKey} updated (Owner: ${licenses[targetKey].owner}, Tier: ${licenses[targetKey].tier}, Status: ${licenses[targetKey].status})`);
   res.json({
     success: true,
     message: 'License updated successfully',
-    license: licenses[key]
+    license: licenses[targetKey]
   });
-});
+}
+
+app.put('/api/admin/licenses/:key', requireAdmin, handleUpdateLicense);
+app.patch('/api/admin/licenses/:key', requireAdmin, handleUpdateLicense);
 
 // Reset IP lock on a key
 app.post('/api/admin/licenses/:key/reset-ip', requireAdmin, (req, res) => {
