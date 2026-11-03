@@ -116,10 +116,6 @@
           <button onclick="switchTab('servers')" id="nav-servers" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-1.5">
             <i class="fa-solid fa-server"></i> Servers
           </button>
-          <button onclick="switchTab('mc-console')" id="nav-mc-console" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-1.5 relative">
-            <i class="fa-solid fa-gamepad text-cyan-400"></i> MC Console
-            <span id="nav-mc-badge" class="px-1.5 py-0.2 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] font-mono">0</span>
-          </button>
           <button onclick="switchTab('console')" id="nav-console" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-1.5 relative">
             <i class="fa-solid fa-terminal text-emerald-400"></i> Console
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -310,85 +306,6 @@
               </tbody>
             </table>
           </div>
-        </div>
-      </section>
-
-      <!-- TAB: MINECRAFT LIVE REMOTE CONSOLE & CONTROL -->
-      <section id="tab-mc-console" class="hidden space-y-4">
-        <div class="bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col h-[78vh]">
-          
-          <!-- Terminal Titlebar -->
-          <div class="bg-zinc-900/90 border-b border-zinc-800 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-            <div class="flex items-center gap-3">
-              <div class="flex items-center gap-1.5">
-                <span class="w-3 h-3 rounded-full bg-red-500/80 inline-block"></span>
-                <span class="w-3 h-3 rounded-full bg-amber-500/80 inline-block"></span>
-                <span class="w-3 h-3 rounded-full bg-emerald-500/80 inline-block"></span>
-              </div>
-              
-              <!-- Server Selector Dropdown -->
-              <div class="flex items-center gap-2">
-                <span class="text-xs font-mono text-zinc-400 flex items-center gap-1">
-                  <i class="fa-solid fa-gamepad text-cyan-400"></i> Server:
-                </span>
-                <select id="mc-active-server-select" onchange="handleSelectMinecraftServer(this.value)" class="bg-zinc-800 border border-zinc-700 text-white text-xs rounded-lg px-2.5 py-1 font-mono focus:ring-0 focus:outline-none max-w-[240px] truncate">
-                  <option value="">-- No Minecraft Server Connected --</option>
-                </select>
-              </div>
-            </div>
-
-            <!-- Server Live Telemetry Badges -->
-            <div id="mc-telemetry-container" class="flex flex-wrap items-center gap-2 text-xs font-mono">
-              <span id="mc-connection-badge" class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700 text-[10px]">
-                <span class="w-1.5 h-1.5 rounded-full bg-zinc-500"></span> OFFLINE
-              </span>
-              <span id="mc-badge-tps" class="hidden px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-emerald-400 text-[11px] font-semibold font-mono">TPS: --</span>
-              <span id="mc-badge-ram" class="hidden px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-purple-300 text-[11px] font-mono">RAM: --</span>
-              <span id="mc-badge-players" class="hidden px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-cyan-300 text-[11px] font-mono">Players: --</span>
-            </div>
-          </div>
-
-          <!-- Quick Action Buttons Bar -->
-          <div class="bg-zinc-900/40 border-b border-zinc-800/80 px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-            <div class="flex items-center gap-1.5 flex-wrap">
-              <span class="text-zinc-500 text-[11px] font-mono mr-1">Quick Commands:</span>
-              <button onclick="sendQuickMinecraftCommand('list')" class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-mono">list</button>
-              <button onclick="sendQuickMinecraftCommand('tps')" class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-mono">tps</button>
-              <button onclick="sendQuickMinecraftCommand('plugins')" class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-mono">plugins</button>
-              <button onclick="sendQuickMinecraftCommand('version')" class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-mono">version</button>
-              <button onclick="sendQuickMinecraftCommand('whitelist on')" class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-mono">whitelist on</button>
-              <button onclick="sendQuickMinecraftCommand('save-all')" class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-mono">save-all</button>
-              <button onclick="sendQuickMinecraftCommand('say Server connected to RSLogin Web Dashboard')" class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-cyan-400 text-[11px] font-mono">say...</button>
-            </div>
-
-            <div class="flex items-center gap-3 text-xs">
-              <label class="flex items-center gap-1.5 text-zinc-400 cursor-pointer text-[11px]">
-                <input id="mc-auto-scroll-toggle" type="checkbox" checked class="rounded bg-zinc-900 border-zinc-700 text-cyan-600 focus:ring-0">
-                <span>Auto-Scroll</span>
-              </label>
-              <button onclick="clearMinecraftConsoleView()" class="text-zinc-400 hover:text-white text-[11px] flex items-center gap-1">
-                <i class="fa-solid fa-broom"></i> Clear
-              </button>
-            </div>
-          </div>
-
-          <!-- Terminal Output Screen -->
-          <div id="mc-terminal-output" class="flex-1 p-4 overflow-y-auto space-y-1 bg-[#09090b] text-[12px] font-mono leading-relaxed select-text">
-            <div class="text-zinc-500">Connecting to Minecraft servers stream...</div>
-          </div>
-
-          <!-- Interactive Minecraft Command Input -->
-          <form onsubmit="handleMinecraftCommandSubmit(event)" class="bg-zinc-900/90 border-t border-zinc-800 px-4 py-3 flex items-center gap-2">
-            <span id="mc-input-prompt" class="text-cyan-400 font-mono text-xs font-semibold select-none flex items-center gap-1">
-              <span id="mc-prompt-srv">minecraft</span><span class="text-zinc-500">:</span><span class="text-emerald-400">~</span><span class="text-zinc-400">$</span>
-            </span>
-            <input id="mc-cmd-input" type="text" autocomplete="off" spellcheck="false" placeholder="Type a server console command (e.g. say Hello, op <player>, whitelist add <name>, tps, kick <player>)..."
-              class="flex-1 bg-transparent border-0 text-xs text-white placeholder-zinc-600 focus:outline-none focus:ring-0 font-mono">
-            <button type="submit" class="px-3.5 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold shadow-md shadow-cyan-600/20 flex items-center gap-1.5">
-              <span>Send</span> <i class="fa-solid fa-paper-plane text-[10px]"></i>
-            </button>
-          </form>
-
         </div>
       </section>
 
@@ -797,11 +714,10 @@
       document.getElementById('dashboard-view').classList.remove('hidden');
       refreshData();
       initConsoleStream();
-      initMinecraftWebSocket();
     }
 
     function switchTab(tab) {
-      ['overview', 'licenses', 'servers', 'mc-console', 'console', 'banned', 'logs'].forEach(t => {
+      ['overview', 'licenses', 'servers', 'console', 'banned', 'logs'].forEach(t => {
         const el = document.getElementById(`tab-${t}`);
         if (el) el.classList.add('hidden');
         const btn = document.getElementById(`nav-${t}`);
@@ -820,9 +736,6 @@
       if (tab === 'console') {
         scrollConsoleToBottom();
         document.getElementById('cmd-input').focus();
-      } else if (tab === 'mc-console') {
-        scrollMinecraftConsoleToBottom();
-        document.getElementById('mc-cmd-input').focus();
       }
     }
 
@@ -831,12 +744,11 @@
       if (icon) icon.classList.add('animate-spin');
 
       try {
-        const [licRes, logRes, banRes, conRes, mcRes] = await Promise.all([
+        const [licRes, logRes, banRes, conRes] = await Promise.all([
           fetch('/api/admin/licenses', { headers: { 'Authorization': `Bearer ${token}` } }),
           fetch('/api/admin/logs', { headers: { 'Authorization': `Bearer ${token}` } }),
           fetch('/api/admin/banned-ips', { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch('/api/admin/console/logs', { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch('/api/admin/minecraft/servers', { headers: { 'Authorization': `Bearer ${token}` } })
+          fetch('/api/admin/console/logs', { headers: { 'Authorization': `Bearer ${token}` } })
         ]);
 
         if (licRes.status === 401 || licRes.status === 403) {
@@ -848,15 +760,10 @@
         const logData = await logRes.json();
         const banData = await banRes.json();
         const conData = await conRes.json();
-        const mcData = mcRes.ok ? await mcRes.json() : { servers: [] };
 
         globalLicenses = licData.licenses || [];
         globalLogs = logData.logs || [];
         globalBannedIps = banData.banned_ips || [];
-        if (mcData && mcData.servers) {
-          globalMinecraftServers = mcData.servers;
-          renderMinecraftServerDropdown();
-        }
 
         renderStats();
         renderLicensesTable(globalLicenses);
@@ -1147,10 +1054,6 @@
             <td class="px-6 py-3.5"><span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 text-[10px]">${srv.product}</span></td>
             <td class="px-6 py-3.5 text-zinc-300 font-mono text-[11px]">${lastSeenDate ? lastSeenDate.toLocaleTimeString() : '—'}</td>
             <td class="px-6 py-3.5 text-right space-x-2">
-              <button onclick="openServerRemoteConsole('${srv.id || ''}', '${srv.ip}', '${srv.port || 25565}')" title="Open Remote Console"
-                class="px-2.5 py-1 rounded-lg text-xs bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-500/30 text-cyan-300 hover:text-white transition-all">
-                <i class="fa-solid fa-gamepad text-[10px] text-cyan-400"></i> Console
-              </button>
               <button onclick="removeServerConnection('${srv.license_key}', '${srv.id}')" title="Disconnect Server"
                 class="px-2.5 py-1 rounded-lg text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-all">
                 <i class="fa-solid fa-link-slash text-[10px] text-amber-400"></i> Disconnect
@@ -1481,327 +1384,6 @@
     function escapeHtml(str) {
       return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
     }
-
-    // ---------------------- Remote Minecraft Consoles & Control ----------------------
-    let globalMinecraftServers = [];
-    let currentSelectedMcServerId = null;
-    let adminMcWs = null;
-    let mcCmdHistory = [];
-    let mcCmdIndex = -1;
-
-    function initMinecraftWebSocket() {
-      if (adminMcWs && (adminMcWs.readyState === WebSocket.OPEN || adminMcWs.readyState === WebSocket.CONNECTING)) {
-        return;
-      }
-
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws/admin?token=${encodeURIComponent(token)}${currentSelectedMcServerId ? `&serverId=${encodeURIComponent(currentSelectedMcServerId)}` : ''}`;
-
-      try {
-        adminMcWs = new WebSocket(wsUrl);
-
-        adminMcWs.onopen = () => {
-          updateMcStatusBadge(true);
-          if (currentSelectedMcServerId) {
-            adminMcWs.send(JSON.stringify({ type: 'SUBSCRIBE', serverId: currentSelectedMcServerId }));
-          }
-        };
-
-        adminMcWs.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            if (data.type === 'MC_SERVERS_UPDATE') {
-              globalMinecraftServers = data.servers || [];
-              renderMinecraftServerDropdown();
-            } else if (data.type === 'MC_LOG_HISTORY') {
-              if (data.serverId === currentSelectedMcServerId) {
-                renderMinecraftLogHistory(data.logs || []);
-              }
-            } else if (data.type === 'MC_LOG') {
-              if (data.serverId === currentSelectedMcServerId) {
-                appendMinecraftConsoleLine(data.log);
-              }
-            }
-          } catch (e) {}
-        };
-
-        adminMcWs.onclose = () => {
-          updateMcStatusBadge(false);
-          setTimeout(() => {
-            if (token) initMinecraftWebSocket();
-          }, 4000);
-        };
-
-        adminMcWs.onerror = () => {
-          updateMcStatusBadge(false);
-        };
-      } catch (e) {
-        updateMcStatusBadge(false);
-      }
-    }
-
-    function updateMcStatusBadge(online) {
-      const badge = document.getElementById('mc-connection-badge');
-      if (!badge) return;
-      if (online && currentSelectedMcServerId) {
-        badge.className = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px]';
-        badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> LIVE CONNECTED';
-      } else {
-        badge.className = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700 text-[10px]';
-        badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-zinc-500"></span> ' + (currentSelectedMcServerId ? 'RECONNECTING...' : 'NO SERVER SELECTED');
-      }
-    }
-
-    function renderMinecraftServerDropdown() {
-      const select = document.getElementById('mc-active-server-select');
-      const badge = document.getElementById('nav-mc-badge');
-      if (badge) badge.innerText = globalMinecraftServers.length;
-
-      if (!select) return;
-
-      if (globalMinecraftServers.length === 0) {
-        select.innerHTML = '<option value="">-- No Minecraft Server Connected --</option>';
-        currentSelectedMcServerId = null;
-        updateMcStatusBadge(false);
-        updateMinecraftTelemetry(null);
-        return;
-      }
-
-      const prevSelected = currentSelectedMcServerId;
-      select.innerHTML = globalMinecraftServers.map(s => `
-        <option value="${s.serverId}" ${s.serverId === currentSelectedMcServerId ? 'selected' : ''}>
-          ${escapeHtml(s.serverName || s.serverId)} [${(s.platform || 'MC').toUpperCase()}]
-        </option>
-      `).join('');
-
-      const exists = globalMinecraftServers.some(s => s.serverId === currentSelectedMcServerId);
-      if (!exists && globalMinecraftServers.length > 0) {
-        handleSelectMinecraftServer(globalMinecraftServers[0].serverId);
-      } else if (exists) {
-        const s = globalMinecraftServers.find(s => s.serverId === currentSelectedMcServerId);
-        updateMinecraftTelemetry(s);
-      }
-    }
-
-    function handleSelectMinecraftServer(serverId) {
-      if (!serverId) {
-        currentSelectedMcServerId = null;
-        updateMcStatusBadge(false);
-        updateMinecraftTelemetry(null);
-        document.getElementById('mc-prompt-srv').innerText = 'minecraft';
-        return;
-      }
-
-      currentSelectedMcServerId = serverId;
-      const s = globalMinecraftServers.find(x => x.serverId === serverId);
-      if (s) {
-        document.getElementById('mc-prompt-srv').innerText = s.platform || 'minecraft';
-        updateMinecraftTelemetry(s);
-      }
-
-      updateMcStatusBadge(true);
-
-      if (adminMcWs && adminMcWs.readyState === WebSocket.OPEN) {
-        adminMcWs.send(JSON.stringify({ type: 'SUBSCRIBE', serverId }));
-      }
-
-      fetchMinecraftServerLogs(serverId);
-    }
-
-    async function fetchMinecraftServerLogs(serverId) {
-      try {
-        const res = await fetch(`/api/admin/minecraft/servers/${encodeURIComponent(serverId)}/logs`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          renderMinecraftLogHistory(data.logs || []);
-        }
-      } catch (e) {}
-    }
-
-    function updateMinecraftTelemetry(server) {
-      const tpsBadge = document.getElementById('mc-badge-tps');
-      const ramBadge = document.getElementById('mc-badge-ram');
-      const playersBadge = document.getElementById('mc-badge-players');
-
-      if (!server || !server.telemetry) {
-        if (tpsBadge) tpsBadge.classList.add('hidden');
-        if (ramBadge) ramBadge.classList.add('hidden');
-        if (playersBadge) playersBadge.classList.add('hidden');
-        return;
-      }
-
-      const telem = server.telemetry;
-      if (tpsBadge) {
-        tpsBadge.classList.remove('hidden');
-        const tps = Number(telem.tps || 20).toFixed(1);
-        tpsBadge.innerText = `TPS: ${tps}`;
-        tpsBadge.className = tps >= 19 ? 'px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] font-mono'
-          : (tps >= 15 ? 'px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[11px] font-mono'
-          : 'px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 text-[11px] font-mono');
-      }
-
-      if (ramBadge) {
-        ramBadge.classList.remove('hidden');
-        ramBadge.innerText = `RAM: ${telem.ramUsed || 0} / ${telem.ramMax || 0} MB`;
-      }
-
-      if (playersBadge) {
-        playersBadge.classList.remove('hidden');
-        playersBadge.innerText = `Players: ${telem.players || 0}/${telem.maxPlayers || 0}`;
-      }
-    }
-
-    function renderMinecraftLogHistory(logs) {
-      const container = document.getElementById('mc-terminal-output');
-      if (!container) return;
-      container.innerHTML = '';
-
-      if (!logs || logs.length === 0) {
-        container.innerHTML = '<div class="text-zinc-500">Connected to Minecraft server console. Waiting for log output...</div>';
-        return;
-      }
-
-      for (const item of logs) {
-        appendMinecraftConsoleLine(item);
-      }
-      scrollMinecraftConsoleToBottom();
-    }
-
-    function appendMinecraftConsoleLine(log) {
-      const container = document.getElementById('mc-terminal-output');
-      if (!container) return;
-
-      const raw = typeof log === 'string' ? log : (log.line || '');
-      const time = log.time || new Date().toLocaleTimeString();
-
-      const lineDiv = document.createElement('div');
-      lineDiv.className = 'flex items-start gap-2 hover:bg-zinc-900/50 px-1 py-0.5 rounded font-mono text-[11px] break-all';
-
-      let coloredMsg = escapeHtml(raw);
-      if (raw.includes('[ERROR]') || raw.includes('[SEVERE]') || raw.includes('Exception') || raw.includes('Error')) {
-        coloredMsg = `<span class="text-red-400 font-semibold">${coloredMsg}</span>`;
-      } else if (raw.includes('[WARN]') || raw.includes('[WARNING]')) {
-        coloredMsg = `<span class="text-amber-300">${coloredMsg}</span>`;
-      } else if (raw.startsWith('>') || raw.startsWith('$')) {
-        coloredMsg = `<span class="text-cyan-400 font-semibold">${coloredMsg}</span>`;
-      } else if (raw.includes('issued server command:')) {
-        coloredMsg = `<span class="text-purple-400">${coloredMsg}</span>`;
-      } else {
-        coloredMsg = `<span class="text-zinc-300">${coloredMsg}</span>`;
-      }
-
-      lineDiv.innerHTML = `
-        <span class="text-zinc-600 select-none text-[10px] shrink-0 pt-0.5">[${time}]</span>
-        <span class="flex-1">${coloredMsg}</span>
-      `;
-
-      container.appendChild(lineDiv);
-
-      const autoScroll = document.getElementById('mc-auto-scroll-toggle');
-      if (autoScroll && autoScroll.checked) {
-        scrollMinecraftConsoleToBottom();
-      }
-    }
-
-    function scrollMinecraftConsoleToBottom() {
-      const container = document.getElementById('mc-terminal-output');
-      if (container) {
-        container.scrollTop = container.scrollHeight;
-      }
-    }
-
-    function clearMinecraftConsoleView() {
-      const container = document.getElementById('mc-terminal-output');
-      if (container) {
-        container.innerHTML = '<div class="text-zinc-500 select-none">Console view cleared. Waiting for new log events...</div>';
-      }
-    }
-
-    function sendQuickMinecraftCommand(command) {
-      const input = document.getElementById('mc-cmd-input');
-      if (input) {
-        input.value = command;
-        handleMinecraftCommandSubmit(new Event('submit'));
-      }
-    }
-
-    async function handleMinecraftCommandSubmit(e) {
-      if (e && e.preventDefault) e.preventDefault();
-
-      const input = document.getElementById('mc-cmd-input');
-      const cmd = (input.value || '').trim();
-      if (!cmd) return;
-
-      if (!currentSelectedMcServerId) {
-        showToast('Please select a connected Minecraft server first!', true);
-        return;
-      }
-
-      mcCmdHistory.push(cmd);
-      mcCmdIndex = mcCmdHistory.length;
-      input.value = '';
-
-      if (adminMcWs && adminMcWs.readyState === WebSocket.OPEN) {
-        adminMcWs.send(JSON.stringify({
-          type: 'EXEC_COMMAND',
-          serverId: currentSelectedMcServerId,
-          command: cmd
-        }));
-      } else {
-        try {
-          const res = await fetch(`/api/admin/minecraft/servers/${encodeURIComponent(currentSelectedMcServerId)}/exec`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ command: cmd })
-          });
-          if (!res.ok) {
-            const d = await res.json();
-            showToast(d.error || 'Failed to dispatch command', true);
-          }
-        } catch (err) {
-          showToast('Error: ' + err.message, true);
-        }
-      }
-    }
-
-    function openServerRemoteConsole(serverId, ip, port) {
-      switchTab('mc-console');
-      let target = globalMinecraftServers.find(s => s.serverId === serverId || (s.ip === ip && s.port == port));
-      if (target) {
-        const select = document.getElementById('mc-active-server-select');
-        if (select) select.value = target.serverId;
-        handleSelectMinecraftServer(target.serverId);
-      }
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-      const mcInput = document.getElementById('mc-cmd-input');
-      if (mcInput) {
-        mcInput.addEventListener('keydown', (e) => {
-          if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            if (mcCmdHistory.length > 0 && mcCmdIndex > 0) {
-              mcCmdIndex--;
-              mcInput.value = mcCmdHistory[mcCmdIndex] || '';
-            }
-          } else if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            if (mcCmdIndex < mcCmdHistory.length - 1) {
-              mcCmdIndex++;
-              mcInput.value = mcCmdHistory[mcCmdIndex] || '';
-            } else {
-              mcCmdIndex = mcCmdHistory.length;
-              mcInput.value = '';
-            }
-          }
-        });
-      }
-    });
   </script>
 </body>
 </html>

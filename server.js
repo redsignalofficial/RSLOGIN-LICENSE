@@ -1,6 +1,4 @@
 const express = require('express');
-const http = require('http');
-const { WebSocketServer } = require('ws');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
@@ -8,7 +6,6 @@ const crypto = require('crypto');
 require('dotenv').config();
 
 const app = express();
-const server = http.createServer(app);
 const PORT = process.env.PORT || 10000;
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'rslogin-admin-secret-change-me';
 const CLIENT_API_KEY = process.env.CLIENT_API_KEY || 'rslogin-api-key-2026';
@@ -156,255 +153,6 @@ function generateKeyString() {
   const segment = () => crypto.randomBytes(2).toString('hex').toUpperCase();
   return `RS-${segment()}-${segment()}-${segment()}-${segment()}`;
 }
-
-function getClientIp(req) {
-  const forwarded = req.headers['x-forwarded-for'];
-  const ip = (forwarded ? forwarded.split(',')[0].trim() : req.socket.remoteAddress) || '127.0.0.1';
-  return ip.replace(/^.*:/, '');
-}
-
-// ---------------------- Remote Minecraft Server Consoles ----------------------
-const activeMinecraftServers = new Map();
-const adminWsClients = new Set();
-const MAX_MC_LOGS = 500;
-
-function pushMinecraftLog(serverId, line) {
-  const mc = activeMinecraftServers.get(serverId);
-  if (!mc) return;
-
-  const now = new Date();
-  const entry = {
-    id: Date.now() + Math.random(),
-    time: now.toLocaleTimeString(),
-    line: String(line)
-  };
-  mc.logs.push(entry);
-  if (mc.logs.length > MAX_MC_LOGS) mc.logs.shift();
-
-  const packet = JSON.stringify({
-    type: 'MC_LOG',
-    serverId: serverId,
-    log: entry
-  });
-
-  for (const client of adminWsClients) {
-    if (client.readyState === 1 && (!client.subscribedServerId || client.subscribedServerId === serverId)) {
-      try { client.send(packet); } catch (e) {}
-    }
-  }
-}
-
-function broadcastMinecraftServersUpdate() {
-  const serversList = getMinecraftServersSummary();
-  const packet = JSON.stringify({
-    type: 'MC_SERVERS_UPDATE',
-    servers: serversList
-  });
-  for (const client of adminWsClients) {
-    if (client.readyState === 1) {
-      try { client.send(packet); } catch (e) {}
-    }
-  }
-}
-
-function getMinecraftServersSummary() {
-  const list = [];
-  for (const [id, s] of activeMinecraftServers.entries()) {
-    list.push({
-      serverId: s.serverId,
-      serverName: s.serverName,
-      platform: s.platform,
-      ip: s.ip,
-      port: s.port,
-      licenseKey: s.licenseKey,
-      connectedAt: s.connectedAt,
-      lastSeen: s.lastSeen,
-      telemetry: s.telemetry || { tps: 20.0, ramUsed: 0, ramMax: 0, players: 0, maxPlayers: 0 }
-    });
-  }
-  return list;
-}
-
-const wss = new WebSocketServer({ noServer: true });
-
-function handlePluginWebSocket(ws, req, url) {
-  let serverId = null;
-  let licenseKey = null;
-
-  ws.on('message', (raw) => {
-    try {
-      const msg = JSON.parse(raw.toString());
-      if (msg.type === 'HANDSHAKE') {
-        licenseKey = msg.licenseKey;
-        const licenses = loadLicenses();
-        const license = licenses[licenseKey];
-        if (!license || license.status !== 'ACTIVE') {
-          ws.send(JSON.stringify({ type: 'ERROR', message: 'License key is invalid or suspended' }));
-          ws.close(4001, 'Invalid License');
-          return;
-        }
-
-        const clientIp = getClientIp(req);
-        const banned = loadBannedIps();
-        if (banned[clientIp]) {
-          ws.send(JSON.stringify({ type: 'ERROR', message: 'IP is blacklisted' }));
-          ws.close(4003, 'IP Blacklisted');
-          return;
-        }
-
-        serverId = msg.serverId || `mc-${Date.now()}`;
-        const serverName = msg.serverName || `${(msg.platform || 'minecraft').toUpperCase()} Server (:${msg.port || 25565})`;
-
-        activeMinecraftServers.set(serverId, {
-          serverId,
-          serverName,
-          platform: msg.platform || 'paper',
-          ip: msg.ip || clientIp,
-          port: msg.port || 25565,
-          licenseKey,
-          connectedAt: new Date().toISOString(),
-          lastSeen: Date.now(),
-          telemetry: { tps: 20.0, ramUsed: 0, ramMax: 0, players: 0, maxPlayers: 0 },
-          logs: [],
-          ws
-        });
-
-        pushConsole('SUCCESS', 'REMOTE', `🟢 Minecraft remote console connected: ${serverName} [${serverId}]`);
-        broadcastMinecraftServersUpdate();
-
-        ws.send(JSON.stringify({ type: 'HANDSHAKE_ACK', status: 'CONNECTED', serverId }));
-      } else if (msg.type === 'LOG') {
-        if (!serverId) return;
-        const s = activeMinecraftServers.get(serverId);
-        if (s) {
-          s.lastSeen = Date.now();
-          const content = msg.lines || msg.line || '';
-          const lines = content.split('\n');
-          for (const line of lines) {
-            if (line.trim()) pushMinecraftLog(serverId, line);
-          }
-        }
-      } else if (msg.type === 'TELEMETRY') {
-        if (!serverId) return;
-        const s = activeMinecraftServers.get(serverId);
-        if (s) {
-          s.lastSeen = Date.now();
-          s.telemetry = {
-            tps: typeof msg.tps === 'number' ? msg.tps : 20.0,
-            ramUsed: msg.ramUsed || 0,
-            ramMax: msg.ramMax || 0,
-            players: msg.players || 0,
-            maxPlayers: msg.maxPlayers || 0
-          };
-          broadcastMinecraftServersUpdate();
-        }
-      } else if (msg.type === 'CMD_ACK') {
-        pushConsole('INFO', 'REMOTE', `Command ACK from [${serverId}]: ${msg.cmdId} (${msg.status})`);
-      }
-    } catch (e) {}
-  });
-
-  ws.on('close', () => {
-    if (serverId && activeMinecraftServers.has(serverId)) {
-      const s = activeMinecraftServers.get(serverId);
-      pushConsole('WARN', 'REMOTE', `🔴 Minecraft remote console disconnected: ${s.serverName} [${serverId}]`);
-      activeMinecraftServers.delete(serverId);
-      broadcastMinecraftServersUpdate();
-    }
-  });
-
-  ws.on('error', () => {
-    if (serverId && activeMinecraftServers.has(serverId)) {
-      activeMinecraftServers.delete(serverId);
-      broadcastMinecraftServersUpdate();
-    }
-  });
-}
-
-function handleAdminWebSocket(ws, req, url) {
-  adminWsClients.add(ws);
-  ws.subscribedServerId = url.searchParams.get('serverId') || null;
-
-  try {
-    ws.send(JSON.stringify({
-      type: 'MC_SERVERS_UPDATE',
-      servers: getMinecraftServersSummary()
-    }));
-
-    if (ws.subscribedServerId && activeMinecraftServers.has(ws.subscribedServerId)) {
-      const s = activeMinecraftServers.get(ws.subscribedServerId);
-      ws.send(JSON.stringify({
-        type: 'MC_LOG_HISTORY',
-        serverId: ws.subscribedServerId,
-        logs: s.logs
-      }));
-    }
-  } catch (e) {}
-
-  ws.on('message', (raw) => {
-    try {
-      const msg = JSON.parse(raw.toString());
-      if (msg.type === 'SUBSCRIBE') {
-        ws.subscribedServerId = msg.serverId;
-        if (msg.serverId && activeMinecraftServers.has(msg.serverId)) {
-          const s = activeMinecraftServers.get(msg.serverId);
-          ws.send(JSON.stringify({
-            type: 'MC_LOG_HISTORY',
-            serverId: msg.serverId,
-            logs: s.logs
-          }));
-        }
-      } else if (msg.type === 'EXEC_COMMAND') {
-        const { serverId, command } = msg;
-        if (!serverId || !command) return;
-        const mc = activeMinecraftServers.get(serverId);
-        if (!mc || mc.ws.readyState !== 1) {
-          ws.send(JSON.stringify({ type: 'ERROR', message: 'Minecraft server is offline' }));
-          return;
-        }
-
-        mc.ws.send(JSON.stringify({
-          type: 'EXEC_COMMAND',
-          cmdId: 'cmd-' + Date.now(),
-          command: command.trim()
-        }));
-        pushMinecraftLog(serverId, `> ${command.trim()}`);
-        pushConsole('CMD', 'MINECRAFT', `Admin sent command to [${mc.serverName}]: ${command.trim()}`);
-      }
-    } catch (e) {}
-  });
-
-  ws.on('close', () => {
-    adminWsClients.delete(ws);
-  });
-}
-
-server.on('upgrade', (request, socket, head) => {
-  try {
-    const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
-    const pathname = url.pathname;
-
-    if (pathname === '/ws/server') {
-      wss.handleUpgrade(request, socket, head, (ws) => {
-        handlePluginWebSocket(ws, request, url);
-      });
-    } else if (pathname === '/ws/admin') {
-      const token = url.searchParams.get('token') || (request.headers['authorization'] || '').replace(/^Bearer\s+/i, '');
-      if (token !== ADMIN_SECRET) {
-        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-        socket.destroy();
-        return;
-      }
-      wss.handleUpgrade(request, socket, head, (ws) => {
-        handleAdminWebSocket(ws, request, url);
-      });
-    } else {
-      socket.destroy();
-    }
-  } catch (err) {
-    socket.destroy();
-  }
-});
 
 // ---------------------- Public Health Endpoint ----------------------
 app.get('/health', (req, res) => {
@@ -601,8 +349,6 @@ app.post('/api/admin/console/exec', requireAdmin, (req, res) => {
         '  suspend <key>                  - Suspend an active license key',
         '  delete <key>                   - Permanently remove a license key',
         '  servers                        - View all active Minecraft servers',
-        '  mc list                        - View live connected Minecraft servers (TPS, RAM, Players)',
-        '  mc exec <serverId> <command>   - Execute console command on a Minecraft server',
         '  kick <key> <ip:port>           - Disconnect a server node from a key',
         '  reset-ip <key>                 - Clear bound IP on an IP-locked key',
         '  ban <ip> [reason]              - Blacklist a server IP address',
@@ -800,42 +546,6 @@ app.post('/api/admin/console/exec', requireAdmin, (req, res) => {
       consoleLogs.length = 0;
       output = 'Console cleared.';
       pushConsole('INFO', 'CLI', output);
-      break;
-
-    case 'mc':
-      const mcSub = args[0] ? args[0].toLowerCase() : 'list';
-      if (mcSub === 'list') {
-        const mcServers = getMinecraftServersSummary();
-        if (mcServers.length === 0) {
-          output = 'No Minecraft servers currently connected via remote console.';
-        } else {
-          output = ['=== Connected Minecraft Servers (' + mcServers.length + ') ===']
-            .concat(mcServers.map(s => `• [${s.serverId}] ${s.serverName} | ${s.ip}:${s.port} | TPS: ${s.telemetry.tps} | RAM: ${s.telemetry.ramUsed}/${s.telemetry.ramMax}MB | Players: ${s.telemetry.players}/${s.telemetry.maxPlayers}`))
-            .join('\n');
-        }
-        pushConsole('INFO', 'CLI', output);
-      } else if (mcSub === 'exec' || mcSub === 'cmd') {
-        const targetId = args[1];
-        const mcCmd = args.slice(2).join(' ');
-        if (!targetId || !mcCmd) {
-          output = 'Usage: mc exec <serverId> <minecraft command>';
-          pushConsole('ERROR', 'CLI', output);
-        } else {
-          const mc = activeMinecraftServers.get(targetId);
-          if (!mc || mc.ws.readyState !== 1) {
-            output = `Error: Minecraft server "${targetId}" is not connected.`;
-            pushConsole('ERROR', 'CLI', output);
-          } else {
-            mc.ws.send(JSON.stringify({ type: 'EXEC_COMMAND', cmdId: 'cmd-' + Date.now(), command: mcCmd }));
-            pushMinecraftLog(targetId, `> ${mcCmd}`);
-            output = `Dispatched to [${mc.serverName}]: ${mcCmd}`;
-            pushConsole('SUCCESS', 'CLI', output);
-          }
-        }
-      } else {
-        output = 'Unknown mc subcommand. Usage: mc list | mc exec <serverId> <command>';
-        pushConsole('WARN', 'CLI', output);
-      }
       break;
 
     default:
@@ -1113,82 +823,11 @@ app.delete('/api/admin/logs', requireAdmin, (req, res) => {
   }
 });
 
-// ---------------------- Remote Minecraft Consoles REST API ----------------------
-
-// Get live connected Minecraft servers
-app.get('/api/admin/minecraft/servers', requireAdmin, (req, res) => {
-  res.json({ servers: getMinecraftServersSummary() });
-});
-
-// Get buffered logs of a specific Minecraft server
-app.get('/api/admin/minecraft/servers/:serverId/logs', requireAdmin, (req, res) => {
-  const mc = activeMinecraftServers.get(req.params.serverId);
-  if (!mc) {
-    return res.status(404).json({ error: 'Server not connected or offline' });
-  }
-  res.json({
-    serverId: mc.serverId,
-    serverName: mc.serverName,
-    platform: mc.platform,
-    telemetry: mc.telemetry,
-    logs: mc.logs
-  });
-});
-
-// Execute command on a specific Minecraft server
-app.post('/api/admin/minecraft/servers/:serverId/exec', requireAdmin, (req, res) => {
-  const { command } = req.body;
-  if (!command || !command.trim()) {
-    return res.status(400).json({ error: 'Command cannot be empty' });
-  }
-
-  const mc = activeMinecraftServers.get(req.params.serverId);
-  if (!mc || mc.ws.readyState !== 1) {
-    return res.status(404).json({ error: 'Minecraft server is offline or unreachable' });
-  }
-
-  const cmd = command.trim();
-  mc.ws.send(JSON.stringify({
-    type: 'EXEC_COMMAND',
-    cmdId: 'cmd-' + Date.now(),
-    command: cmd
-  }));
-
-  pushMinecraftLog(mc.serverId, `> ${cmd}`);
-  pushConsole('CMD', 'MINECRAFT', `Admin executed on [${mc.serverName}]: ${cmd}`);
-
-  res.json({
-    success: true,
-    message: `Command "${cmd}" sent to ${mc.serverName}.`
-  });
-});
-
-// Disconnect a Minecraft server
-app.post('/api/admin/minecraft/servers/:serverId/disconnect', requireAdmin, (req, res) => {
-  const mc = activeMinecraftServers.get(req.params.serverId);
-  if (!mc) {
-    return res.status(404).json({ error: 'Minecraft server is not connected' });
-  }
-
-  try {
-    mc.ws.close(4000, 'Disconnected by Admin');
-  } catch (e) {}
-  activeMinecraftServers.delete(req.params.serverId);
-  broadcastMinecraftServersUpdate();
-  pushConsole('WARN', 'REMOTE', `Admin forcefully disconnected [${mc.serverName}]`);
-
-  res.json({
-    success: true,
-    message: `Server ${mc.serverName} disconnected.`
-  });
-});
-
 // ---------------------- Start Server ----------------------
-server.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`===============================================`);
   console.log(`🚀 RSLogin License Server online on port ${PORT}`);
   console.log(`📡 Health Check: http://localhost:${PORT}/health`);
   console.log(`🔑 Admin Auth: PROTECTED`);
-  console.log(`🎮 Remote Console WebSocket: ws://localhost:${PORT}/ws/server`);
   console.log(`===============================================`);
 });
