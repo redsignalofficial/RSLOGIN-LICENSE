@@ -828,6 +828,6 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`===============================================`);
   console.log(`🚀 RSLogin License Server online on port ${PORT}`);
   console.log(`📡 Health Check: http://localhost:${PORT}/health`);
-  console.log(`🔑 Admin Secret: ${ADMIN_SECRET}`);
+  console.log(`🔑 Admin Auth: PROTECTED`);
   console.log(`===============================================`);
 });
