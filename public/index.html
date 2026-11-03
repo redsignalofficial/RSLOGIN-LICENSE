@@ -1091,8 +1091,10 @@
           overviewTbody.innerHTML = serverList.slice(0, 10).map(srv => {
             const relTime = formatRelativeTime(srv.last_seen);
             const statusBadge = getServerStatusBadge(srv);
-            const serverTitle = escapeHtml(srv.server_name || srv.motd || 'Minecraft Server');
-            const motdText = (srv.motd && srv.motd !== srv.server_name) ? `<div class="text-[11px] text-zinc-500 font-mono truncate max-w-xs">${escapeHtml(srv.motd)}</div>` : '';
+            const serverTitle = renderMinecraftMotd(srv.server_name || 'Minecraft Server');
+            const motdText = (srv.motd && srv.motd !== srv.server_name)
+              ? `<div class="mt-1 px-2.5 py-1 rounded bg-[#0D0D0D] border border-[#242424] text-[11px] font-mono leading-relaxed inline-block max-w-md text-zinc-300 shadow-sm">${renderMinecraftMotd(srv.motd)}</div>`
+              : '';
 
             return `
               <tr class="hover:bg-[#1F1F1F]/60 transition-colors">
@@ -1133,8 +1135,10 @@
         tbody.innerHTML = serverList.map(srv => {
           const relTime = formatRelativeTime(srv.last_seen);
           const statusBadge = getServerStatusBadge(srv);
-          const serverTitle = escapeHtml(srv.server_name || srv.motd || 'Minecraft Server');
-          const motdText = (srv.motd && srv.motd !== srv.server_name) ? `<div class="text-[11px] text-zinc-500 font-mono truncate max-w-xs">${escapeHtml(srv.motd)}</div>` : '';
+          const serverTitle = renderMinecraftMotd(srv.server_name || 'Minecraft Server');
+          const motdText = (srv.motd && srv.motd !== srv.server_name)
+            ? `<div class="mt-1 px-2.5 py-1 rounded bg-[#0D0D0D] border border-[#242424] text-[11px] font-mono leading-relaxed inline-block max-w-md text-zinc-300 shadow-sm">${renderMinecraftMotd(srv.motd)}</div>`
+            : '';
 
           return `
             <tr class="hover:bg-[#1F1F1F]/60 transition-colors">
@@ -1506,14 +1510,17 @@
         tbody.innerHTML = servers.map(srv => {
           const statusBadge = getServerStatusBadge(srv);
           const relTime = formatRelativeTime(srv.last_seen);
-          const serverTitle = escapeHtml(srv.server_name || srv.motd || 'Minecraft Server');
+          const serverTitle = renderMinecraftMotd(srv.server_name || 'Minecraft Server');
+          const motdText = (srv.motd && srv.motd !== srv.server_name)
+            ? `<div class="mt-1 px-2 py-0.5 rounded bg-[#0D0D0D] border border-[#242424] text-[10px] font-mono leading-relaxed inline-block text-zinc-300">${renderMinecraftMotd(srv.motd)}</div>`
+            : '';
 
           return `
             <tr class="hover:bg-[#1F1F1F]/60">
               <td class="px-4 py-2.5">${statusBadge}</td>
               <td class="px-4 py-2.5">
                 <div class="font-bold text-white text-xs">${serverTitle}</div>
-                ${srv.motd && srv.motd !== srv.server_name ? `<div class="text-[10px] text-zinc-500 font-mono">${escapeHtml(srv.motd)}</div>` : ''}
+                ${motdText}
               </td>
               <td class="px-4 py-2.5 font-mono text-purple-300 text-xs">${srv.online_players || 0} / ${srv.max_players || 0}</td>
               <td class="px-4 py-2.5 font-mono text-white text-xs">${srv.ip}:${srv.port || 25565}</td>
@@ -1658,6 +1665,143 @@
 
     function escapeAttr(str) {
       return (str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    }
+
+    // ---------------------- Minecraft MOTD & Color Code Parser ----------------------
+    function stripMinecraftFormatting(raw) {
+      if (!raw) return '';
+      return String(raw)
+        .replace(/§x(§[0-9a-fA-F]){6}/gi, '')
+        .replace(/&#[0-9a-fA-F]{6}/gi, '')
+        .replace(/[<]#([0-9a-fA-F]{6})>/gi, '')
+        .replace(/§[0-9a-fk-orA-FK-OR]/gi, '')
+        .replace(/&[0-9a-fk-orA-FK-OR]/gi, '')
+        .trim();
+    }
+
+    function renderMinecraftMotd(raw) {
+      if (!raw) return '';
+
+      // Normalize missing section symbols, e.g. "4§l" -> "§4§l"
+      let text = String(raw).replace(/(^|[^§&])([0-9a-fk-orA-FK-OR])§([0-9a-fk-orA-FK-OR])/gi, '$1§$2§$3');
+
+      const mcColors = {
+        '0': '#000000', '1': '#0000AA', '2': '#00AA00', '3': '#00AAAA',
+        '4': '#AA0000', '5': '#AA00AA', '6': '#FFAA00', '7': '#AAAAAA',
+        '8': '#555555', '9': '#5555FF', 'a': '#55FF55', 'b': '#55FFFF',
+        'c': '#FF5555', 'd': '#FF55FF', 'e': '#FFFF55', 'f': '#FFFFFF'
+      };
+
+      // Convert Spigot/Bungee §x§r§r§g§g§b§b to §#rrggbb
+      text = text.replace(/§x§([0-9a-fA-F])§([0-9a-fA-F])§([0-9a-fA-F])§([0-9a-fA-F])§([0-9a-fA-F])§([0-9a-fA-F])/gi, (m, r1, r2, g1, g2, b1, b2) => {
+        return `§#${r1}${r2}${g1}${g2}${b1}${b2}`;
+      });
+
+      // Convert MiniMessage &#rrggbb and <#rrggbb> to §#rrggbb
+      text = text.replace(/[<&]#([0-9a-fA-F]{6})>?/gi, '§#$1');
+
+      let currentColor = null;
+      let isBold = false;
+      let isItalic = false;
+      let isUnderline = false;
+      let isStrike = false;
+
+      let html = '';
+      let buffer = '';
+
+      function flush() {
+        if (!buffer) return;
+        const style = [];
+        if (currentColor) style.push(`color: ${currentColor}`);
+        if (isBold) style.push(`font-weight: 700`);
+        if (isItalic) style.push(`font-style: italic`);
+        const textDec = [];
+        if (isUnderline) textDec.push(`underline`);
+        if (isStrike) textDec.push(`line-through`);
+        if (textDec.length > 0) style.push(`text-decoration: ${textDec.join(' ')}`);
+
+        // Strictly escape plain text buffer to prevent XSS
+        const escaped = buffer.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        if (style.length > 0) {
+          html += `<span style="${style.join('; ')}">${escaped}</span>`;
+        } else {
+          html += escaped;
+        }
+        buffer = '';
+      }
+
+      let i = 0;
+      while (i < text.length) {
+        if (text[i] === '\n') {
+          flush();
+          html += '<br>';
+          i++;
+          continue;
+        }
+        if (text[i] === '\r') {
+          i++;
+          continue;
+        }
+
+        if (text[i] === '§' || text[i] === '&') {
+          // Check for §#rrggbb hex color
+          if (text[i + 1] === '#' && i + 8 <= text.length) {
+            const hex = text.substr(i + 1, 7);
+            if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
+              flush();
+              currentColor = hex;
+              i += 8;
+              continue;
+            }
+          }
+
+          // Check single character code
+          if (i + 1 < text.length) {
+            const code = text[i + 1].toLowerCase();
+            if (mcColors[code] !== undefined) {
+              flush();
+              currentColor = mcColors[code];
+              i += 2;
+              continue;
+            } else if (code === 'l') {
+              flush();
+              isBold = true;
+              i += 2;
+              continue;
+            } else if (code === 'o') {
+              flush();
+              isItalic = true;
+              i += 2;
+              continue;
+            } else if (code === 'n') {
+              flush();
+              isUnderline = true;
+              i += 2;
+              continue;
+            } else if (code === 'm') {
+              flush();
+              isStrike = true;
+              i += 2;
+              continue;
+            } else if (code === 'r') {
+              flush();
+              currentColor = null;
+              isBold = false;
+              isItalic = false;
+              isUnderline = false;
+              isStrike = false;
+              i += 2;
+              continue;
+            }
+          }
+        }
+
+        buffer += text[i];
+        i++;
+      }
+      flush();
+
+      return html;
     }
   </script>
 </body>
