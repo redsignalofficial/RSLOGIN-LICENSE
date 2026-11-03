@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: rslogin-license
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 18.20.0
+      - key: PORT
+        value: 10000
+      - key: ADMIN_SECRET
+        generateValue: true
+      - key: SECRET_SIGN_KEY
+        generateValue: true
