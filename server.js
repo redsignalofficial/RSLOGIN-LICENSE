@@ -87,8 +87,8 @@ function generateKeyString() {
   return `RS-${segment()}-${segment()}-${segment()}-${segment()}`;
 }
 
-// ---------------------- Public Health Endpoints ----------------------
-app.get(['/', '/health'], (req, res) => {
+// ---------------------- Public Health Endpoint ----------------------
+app.get('/health', (req, res) => {
   res.json({
     status: 'ONLINE',
     service: 'RSLogin License Verification API',
