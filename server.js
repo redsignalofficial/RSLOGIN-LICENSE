@@ -23,6 +23,53 @@ if (!fs.existsSync(path.join(__dirname, 'data'))) {
   fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true });
 }
 
+// ---------------------- Real-Time Console Buffer & Streaming ----------------------
+const consoleLogs = [];
+const MAX_CONSOLE_LOGS = 600;
+const sseClients = new Set();
+
+function pushConsole(level, tag, message) {
+  const now = new Date();
+  const time = now.toLocaleTimeString();
+  const entry = {
+    id: Date.now() + Math.random(),
+    time,
+    timestamp: now.toISOString(),
+    level: level.toUpperCase(), // INFO, SUCCESS, WARN, ERROR, CMD
+    tag: tag.toUpperCase(),     // SYSTEM, LICENSE, SECURITY, ADMIN, CLI
+    message: typeof message === 'object' ? JSON.stringify(message) : String(message)
+  };
+  consoleLogs.push(entry);
+  if (consoleLogs.length > MAX_CONSOLE_LOGS) consoleLogs.shift();
+
+  // Broadcast to live dashboard SSE streams
+  for (const client of sseClients) {
+    try {
+      client.write(`data: ${JSON.stringify(entry)}\n\n`);
+    } catch (e) {
+      sseClients.delete(client);
+    }
+  }
+}
+
+// Monkey-patch console for automatic terminal logging
+const origLog = console.log;
+const origError = console.error;
+const origWarn = console.warn;
+
+console.log = (...args) => {
+  origLog(...args);
+  pushConsole('INFO', 'SYSTEM', args.join(' '));
+};
+console.error = (...args) => {
+  origError(...args);
+  pushConsole('ERROR', 'SYSTEM', args.join(' '));
+};
+console.warn = (...args) => {
+  origWarn(...args);
+  pushConsole('WARN', 'SYSTEM', args.join(' '));
+};
+
 function loadLicenses() {
   try {
     if (fs.existsSync(DATA_FILE)) {
@@ -112,7 +159,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ONLINE',
     service: 'RSLogin License Verification API',
-    version: '1.2.0',
+    version: '1.4.0',
     timestamp: new Date().toISOString()
   });
 });
@@ -127,6 +174,7 @@ app.post('/api/license/validate', (req, res) => {
   const bannedIps = loadBannedIps();
   if (bannedIps[clientIp]) {
     const banInfo = bannedIps[clientIp];
+    pushConsole('ERROR', 'SECURITY', `🚫 Blocked connection from banned IP ${clientIp} (${banInfo.reason || 'Blacklisted'})`);
     logValidation({ key: license_key || 'UNKNOWN', valid: false, reason: `IP ${clientIp} is BANNED (${banInfo.reason || 'Blacklisted'})`, ip: clientIp, product });
     return res.status(403).json({
       valid: false,
@@ -138,6 +186,7 @@ app.post('/api/license/validate', (req, res) => {
   // 2. API Key authentication check
   const providedApiKey = req.headers['x-api-key'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '').trim() || api_key;
   if (CLIENT_API_KEY && providedApiKey !== CLIENT_API_KEY && providedApiKey !== ADMIN_SECRET) {
+    pushConsole('WARN', 'SECURITY', `⚠️ Unauthorized API key attempt from ${clientIp} (Product: ${product || 'unknown'})`);
     logValidation({ key: license_key || 'UNKNOWN', valid: false, reason: 'Invalid or missing API key', ip: clientIp, product });
     return res.status(401).json({
       valid: false,
@@ -148,6 +197,7 @@ app.post('/api/license/validate', (req, res) => {
 
   // 3. License key presence
   if (!license_key || typeof license_key !== 'string') {
+    pushConsole('WARN', 'LICENSE', `⚠️ Empty license key provided by ${clientIp}`);
     logValidation({ key: 'EMPTY', valid: false, reason: 'Missing license key', ip: clientIp, product });
     return res.status(400).json({
       valid: false,
@@ -160,6 +210,7 @@ app.post('/api/license/validate', (req, res) => {
   const license = licenses[license_key.trim()];
 
   if (!license) {
+    pushConsole('WARN', 'LICENSE', `🔴 Key not found in database: "${license_key}" from ${clientIp}`);
     logValidation({ key: license_key, valid: false, reason: 'Key not found', ip: clientIp, product });
     return res.status(200).json({
       valid: false,
@@ -169,6 +220,7 @@ app.post('/api/license/validate', (req, res) => {
   }
 
   if (license.status !== 'ACTIVE') {
+    pushConsole('WARN', 'LICENSE', `🔴 Denied ${clientIp}: key ${license.key} status is ${license.status}`);
     logValidation({ key: license_key, valid: false, reason: `Status: ${license.status}`, ip: clientIp, product });
     return res.status(200).json({
       valid: false,
@@ -178,6 +230,7 @@ app.post('/api/license/validate', (req, res) => {
   }
 
   if (license.expires_at && new Date() > new Date(license.expires_at)) {
+    pushConsole('WARN', 'LICENSE', `🔴 Denied ${clientIp}: key ${license.key} expired on ${license.expires_at}`);
     logValidation({ key: license_key, valid: false, reason: 'License expired', ip: clientIp, product });
     return res.status(200).json({
       valid: false,
@@ -192,7 +245,9 @@ app.post('/api/license/validate', (req, res) => {
       license.bound_ip = clientIp;
       licenses[license_key.trim()] = license;
       saveLicenses(licenses);
+      pushConsole('INFO', 'LICENSE', `🔒 Key ${license.key} automatically bound to first IP: ${clientIp}`);
     } else if (license.bound_ip && license.bound_ip !== clientIp && license.bound_ip !== server_ip) {
+      pushConsole('WARN', 'SECURITY', `🚫 IP mismatch for ${license.key}: bound=${license.bound_ip}, caller=${clientIp}`);
       logValidation({ key: license_key, valid: false, reason: `IP mismatch (bound: ${license.bound_ip}, got: ${clientIp})`, ip: clientIp, product });
       return res.status(200).json({
         valid: false,
@@ -207,6 +262,7 @@ app.post('/api/license/validate', (req, res) => {
   const serverId = `${clientIp}:${port || 25565}`;
   const existingServers = Object.keys(license.servers);
   if (license.max_servers && !license.servers[serverId] && existingServers.length >= license.max_servers) {
+    pushConsole('WARN', 'LICENSE', `⚠️ Server limit exceeded for ${license.key}: ${existingServers.length}/${license.max_servers}`);
     logValidation({ key: license_key, valid: false, reason: `Max server limit reached (${existingServers.length}/${license.max_servers})`, ip: clientIp, product });
     return res.status(200).json({
       valid: false,
@@ -230,6 +286,7 @@ app.post('/api/license/validate', (req, res) => {
   const timestamp = Math.floor(Date.now() / 1000);
   const signature = generateSignature(license.key, license.status, timestamp);
 
+  pushConsole('SUCCESS', 'LICENSE', `🟢 Server ${serverId} (${product || 'rslogin'}) validated key ${license.key} [${license.owner}]`);
   logValidation({ key: license_key, valid: true, owner: license.owner, ip: clientIp, product });
 
   return res.status(200).json({
@@ -258,6 +315,297 @@ function requireAdmin(req, res, next) {
   }
   next();
 }
+
+// ---------------------- Interactive Console & Terminal CLI ----------------------
+
+// Execute terminal command
+app.post('/api/admin/console/exec', requireAdmin, (req, res) => {
+  const rawCommand = (req.body.command || '').trim();
+  if (!rawCommand) {
+    return res.status(400).json({ error: 'Command cannot be empty' });
+  }
+
+  pushConsole('CMD', 'CLI', `$ ${rawCommand}`);
+
+  const parts = rawCommand.split(/\s+/);
+  const cmd = parts[0].toLowerCase();
+  const args = parts.slice(1);
+
+  const licenses = loadLicenses();
+  const banned = loadBannedIps();
+
+  let output = '';
+
+  switch (cmd) {
+    case 'help':
+      output = [
+        '======================= RSLogin License CLI =======================',
+        'Available Commands:',
+        '  help                           - Show this help manual',
+        '  status / stats                 - View server health, memory and node telemetry',
+        '  keys / list                    - List all license keys and owners',
+        '  gen <owner> [tier] [max]       - Quick generate a new license key',
+        '  activate <key>                 - Activate a suspended license key',
+        '  suspend <key>                  - Suspend an active license key',
+        '  delete <key>                   - Permanently remove a license key',
+        '  servers                        - View all active Minecraft servers',
+        '  kick <key> <ip:port>           - Disconnect a server node from a key',
+        '  reset-ip <key>                 - Clear bound IP on an IP-locked key',
+        '  ban <ip> [reason]              - Blacklist a server IP address',
+        '  unban <ip>                     - Remove an IP address from blacklist',
+        '  banned                         - List all blacklisted IP addresses',
+        '  clear                          - Flush terminal log buffer',
+        '==================================================================='
+      ].join('\n');
+      pushConsole('INFO', 'CLI', output);
+      break;
+
+    case 'status':
+    case 'stats':
+      const mem = process.memoryUsage();
+      const uptimeSec = Math.floor(process.uptime());
+      const hours = Math.floor(uptimeSec / 3600);
+      const mins = Math.floor((uptimeSec % 3600) / 60);
+      const secs = uptimeSec % 60;
+      let totalSrv = 0;
+      Object.values(licenses).forEach(l => { if (l.servers) totalSrv += Object.keys(l.servers).length; });
+
+      output = [
+        `System Status:        ONLINE`,
+        `Uptime:               ${hours}h ${mins}m ${secs}s`,
+        `Memory RSS:           ${(mem.rss / 1024 / 1024).toFixed(2)} MB`,
+        `Heap Usage:           ${(mem.heapUsed / 1024 / 1024).toFixed(2)} MB`,
+        `Node Runtime:         ${process.version} (${process.platform})`,
+        `Total Licenses:       ${Object.keys(licenses).length}`,
+        `Connected Servers:    ${totalSrv}`,
+        `Banned IPs:           ${Object.keys(banned).length}`
+      ].join('\n');
+      pushConsole('SUCCESS', 'CLI', output);
+      break;
+
+    case 'keys':
+    case 'list':
+      const keyList = Object.values(licenses);
+      if (keyList.length === 0) {
+        output = 'No license keys found in database.';
+      } else {
+        output = keyList.map(k => {
+          const srvCount = k.servers ? Object.keys(k.servers).length : 0;
+          return `• [${k.status}] ${k.key} | Owner: ${k.owner || '—'} | Tier: ${k.tier || 'STANDARD'} | Servers: ${srvCount}/${k.max_servers || 3}${k.ip_lock ? ' (IP-Locked)' : ''}`;
+        }).join('\n');
+      }
+      pushConsole('INFO', 'CLI', output);
+      break;
+
+    case 'gen':
+    case 'create':
+      const owner = args[0] || 'Customer';
+      const tier = (args[1] || 'PREMIUM').toUpperCase();
+      const max_servers = parseInt(args[2]) || 3;
+      const newKey = generateKeyString();
+
+      licenses[newKey] = {
+        key: newKey,
+        owner,
+        tier,
+        status: 'ACTIVE',
+        max_servers,
+        ip_lock: false,
+        bound_ip: null,
+        created_at: new Date().toISOString(),
+        expires_at: null,
+        note: 'Generated from Console CLI',
+        servers: {}
+      };
+      saveLicenses(licenses);
+
+      output = `✓ License generated: ${newKey} for ${owner} [Tier: ${tier}, Max Servers: ${max_servers}]`;
+      pushConsole('SUCCESS', 'CLI', output);
+      break;
+
+    case 'activate':
+      const actKey = args[0];
+      if (!actKey || !licenses[actKey]) {
+        output = `Error: License key "${actKey}" not found.`;
+        pushConsole('ERROR', 'CLI', output);
+      } else {
+        licenses[actKey].status = 'ACTIVE';
+        saveLicenses(licenses);
+        output = `✓ License ${actKey} is now ACTIVE.`;
+        pushConsole('SUCCESS', 'CLI', output);
+      }
+      break;
+
+    case 'suspend':
+      const suspKey = args[0];
+      if (!suspKey || !licenses[suspKey]) {
+        output = `Error: License key "${suspKey}" not found.`;
+        pushConsole('ERROR', 'CLI', output);
+      } else {
+        licenses[suspKey].status = 'SUSPENDED';
+        saveLicenses(licenses);
+        output = `✓ License ${suspKey} is now SUSPENDED.`;
+        pushConsole('WARN', 'CLI', output);
+      }
+      break;
+
+    case 'delete':
+    case 'remove':
+      const delKey = args[0];
+      if (!delKey || !licenses[delKey]) {
+        output = `Error: License key "${delKey}" not found.`;
+        pushConsole('ERROR', 'CLI', output);
+      } else {
+        delete licenses[delKey];
+        saveLicenses(licenses);
+        output = `✓ License ${delKey} has been permanently deleted.`;
+        pushConsole('WARN', 'CLI', output);
+      }
+      break;
+
+    case 'servers':
+      const srvList = [];
+      Object.values(licenses).forEach(k => {
+        if (k.servers) {
+          Object.values(k.servers).forEach(s => {
+            srvList.push(`• ${s.ip}:${s.port || 25565} | Key: ${k.key} (${k.owner}) | Product: ${s.product} | Last Ping: ${s.last_seen ? new Date(s.last_seen).toLocaleTimeString() : '—'}`);
+          });
+        }
+      });
+      output = srvList.length > 0 ? srvList.join('\n') : 'No Minecraft server nodes currently connected.';
+      pushConsole('INFO', 'CLI', output);
+      break;
+
+    case 'kick':
+      const kKey = args[0];
+      const kServerId = args[1];
+      if (!kKey || !kServerId || !licenses[kKey] || !licenses[kKey].servers?.[kServerId]) {
+        output = `Error: Invalid syntax or server not found. Usage: kick <license_key> <ip:port>`;
+        pushConsole('ERROR', 'CLI', output);
+      } else {
+        delete licenses[kKey].servers[kServerId];
+        saveLicenses(licenses);
+        output = `✓ Server ${kServerId} disconnected from key ${kKey}.`;
+        pushConsole('SUCCESS', 'CLI', output);
+      }
+      break;
+
+    case 'reset-ip':
+      const rKey = args[0];
+      if (!rKey || !licenses[rKey]) {
+        output = `Error: License key "${rKey}" not found.`;
+        pushConsole('ERROR', 'CLI', output);
+      } else {
+        licenses[rKey].bound_ip = null;
+        saveLicenses(licenses);
+        output = `✓ Bound IP cleared for ${rKey}. Next connection will re-bind.`;
+        pushConsole('SUCCESS', 'CLI', output);
+      }
+      break;
+
+    case 'ban':
+      const banIp = args[0];
+      const banReason = args.slice(1).join(' ') || 'Banned via Console CLI';
+      if (!banIp) {
+        output = 'Error: IP address is required. Usage: ban <ip> [reason]';
+        pushConsole('ERROR', 'CLI', output);
+      } else {
+        banned[banIp.trim()] = {
+          ip: banIp.trim(),
+          reason: banReason,
+          banned_at: new Date().toISOString()
+        };
+        saveBannedIps(banned);
+        output = `⛔ IP ${banIp.trim()} has been blacklisted. Reason: ${banReason}`;
+        pushConsole('ERROR', 'CLI', output);
+      }
+      break;
+
+    case 'unban':
+      const unbanIp = args[0];
+      if (!unbanIp || !banned[unbanIp.trim()]) {
+        output = `Error: IP "${unbanIp}" not found in blacklist.`;
+        pushConsole('ERROR', 'CLI', output);
+      } else {
+        delete banned[unbanIp.trim()];
+        saveBannedIps(banned);
+        output = `✓ IP ${unbanIp.trim()} has been unbanned.`;
+        pushConsole('SUCCESS', 'CLI', output);
+      }
+      break;
+
+    case 'banned':
+      const bList = Object.values(banned);
+      output = bList.length > 0
+        ? bList.map(b => `• ${b.ip} | Reason: ${b.reason || '—'} | Date: ${new Date(b.banned_at).toLocaleString()}`).join('\n')
+        : 'No IP addresses are currently blacklisted.';
+      pushConsole('INFO', 'CLI', output);
+      break;
+
+    case 'clear':
+      consoleLogs.length = 0;
+      output = 'Console cleared.';
+      pushConsole('INFO', 'CLI', output);
+      break;
+
+    default:
+      output = `Command not recognized: "${cmd}". Type "help" for a list of commands.`;
+      pushConsole('WARN', 'CLI', output);
+      break;
+  }
+
+  res.json({ success: true, command: rawCommand, output });
+});
+
+// Get recent console logs and telemetry metrics
+app.get('/api/admin/console/logs', requireAdmin, (req, res) => {
+  const mem = process.memoryUsage();
+  res.json({
+    logs: consoleLogs,
+    metrics: {
+      uptime: Math.floor(process.uptime()),
+      memory_rss_mb: (mem.rss / 1024 / 1024).toFixed(1),
+      memory_heap_mb: (mem.heapUsed / 1024 / 1024).toFixed(1),
+      node_version: process.version,
+      platform: process.platform,
+      active_streams: sseClients.size
+    }
+  });
+});
+
+// Real-time Server-Sent Events stream for Console Viewer
+app.get('/api/admin/console/stream', (req, res) => {
+  const token = req.query.token || req.headers['authorization']?.replace(/^Bearer\s+/i, '').trim();
+  if (token !== ADMIN_SECRET) {
+    return res.status(401).send('Unauthorized to stream console');
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  res.write(`data: ${JSON.stringify({
+    id: Date.now(),
+    time: new Date().toLocaleTimeString(),
+    level: 'INFO',
+    tag: 'SYSTEM',
+    message: '🖥️ Connected to RSLogin Interactive Terminal. Type "help" to view commands.'
+  })}\n\n`);
+
+  sseClients.add(res);
+
+  req.on('close', () => {
+    sseClients.delete(res);
+  });
+});
+
+// Clear console buffer
+app.delete('/api/admin/console/logs', requireAdmin, (req, res) => {
+  consoleLogs.length = 0;
+  pushConsole('INFO', 'ADMIN', 'Console buffer cleared by administrator.');
+  res.json({ success: true, message: 'Console buffer cleared.' });
+});
 
 // ---------------------- Admin License Management ----------------------
 
@@ -297,6 +645,7 @@ app.post('/api/admin/licenses', requireAdmin, (req, res) => {
   };
 
   saveLicenses(licenses);
+  pushConsole('SUCCESS', 'ADMIN', `✨ New license created: ${key} for ${owner} [Tier: ${tier}, Max: ${max_servers}]`);
   res.status(201).json({
     success: true,
     message: 'License created successfully',
@@ -326,6 +675,7 @@ app.put('/api/admin/licenses/:key', requireAdmin, (req, res) => {
   licenses[key].updated_at = new Date().toISOString();
   saveLicenses(licenses);
 
+  pushConsole('INFO', 'ADMIN', `✏️ License ${key} updated (Status: ${licenses[key].status})`);
   res.json({
     success: true,
     message: 'License updated successfully',
@@ -333,7 +683,7 @@ app.put('/api/admin/licenses/:key', requireAdmin, (req, res) => {
   });
 });
 
-// Reset IP lock on a key (allows binding to a new IP)
+// Reset IP lock on a key
 app.post('/api/admin/licenses/:key/reset-ip', requireAdmin, (req, res) => {
   const licenses = loadLicenses();
   const key = req.params.key;
@@ -344,6 +694,7 @@ app.post('/api/admin/licenses/:key/reset-ip', requireAdmin, (req, res) => {
 
   licenses[key].bound_ip = null;
   saveLicenses(licenses);
+  pushConsole('INFO', 'ADMIN', `🔓 IP lock reset for key ${key}`);
 
   res.json({
     success: true,
@@ -363,6 +714,7 @@ app.delete('/api/admin/licenses/:key/servers/:serverId', requireAdmin, (req, res
   if (licenses[key].servers && licenses[key].servers[serverId]) {
     delete licenses[key].servers[serverId];
     saveLicenses(licenses);
+    pushConsole('WARN', 'ADMIN', `🔌 Disconnected server node ${serverId} from key ${key}`);
     return res.json({
       success: true,
       message: `Server ${serverId} removed from license ${key}`
@@ -383,6 +735,7 @@ app.delete('/api/admin/licenses/:key', requireAdmin, (req, res) => {
 
   delete licenses[key];
   saveLicenses(licenses);
+  pushConsole('WARN', 'ADMIN', `🗑️ Permanently deleted license ${key}`);
 
   res.json({
     success: true,
@@ -417,6 +770,7 @@ app.post('/api/admin/banned-ips', requireAdmin, (req, res) => {
   };
 
   saveBannedIps(banned);
+  pushConsole('ERROR', 'SECURITY', `⛔ Admin blacklisted IP ${cleanIp} (Reason: ${reason})`);
   res.status(201).json({
     success: true,
     message: `IP ${cleanIp} has been banned.`,
@@ -435,6 +789,7 @@ app.delete('/api/admin/banned-ips/:ip', requireAdmin, (req, res) => {
 
   delete banned[cleanIp];
   saveBannedIps(banned);
+  pushConsole('INFO', 'SECURITY', `🟢 Admin unbanned IP ${cleanIp}`);
 
   res.json({
     success: true,
@@ -461,6 +816,7 @@ app.get('/api/admin/logs', requireAdmin, (req, res) => {
 app.delete('/api/admin/logs', requireAdmin, (req, res) => {
   try {
     fs.writeFileSync(LOGS_FILE, JSON.stringify([], null, 2), 'utf8');
+    pushConsole('INFO', 'ADMIN', `🧹 Validation audit logs cleared by admin.`);
     res.json({ success: true, message: 'Audit logs cleared successfully.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -470,7 +826,7 @@ app.delete('/api/admin/logs', requireAdmin, (req, res) => {
 // ---------------------- Start Server ----------------------
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`===============================================`);
-  console.log(`🚀 RSLogin License Server running on port ${PORT}`);
+  console.log(`🚀 RSLogin License Server online on port ${PORT}`);
   console.log(`📡 Health Check: http://localhost:${PORT}/health`);
   console.log(`🔑 Admin Secret: ${ADMIN_SECRET}`);
   console.log(`===============================================`);
