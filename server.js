@@ -1020,12 +1020,13 @@ function handleUpdateLicense(req, res) {
     return res.status(404).json({ error: 'License not found' });
   }
 
-  const { new_key, status, owner, tier, max_servers, ip_lock, bound_ip, expires_at, note } = req.body || {};
+  const { new_key, key: bodyKey, status, owner, tier, max_servers, ip_lock, bound_ip, expires_at, note } = req.body || {};
   let targetKey = key;
+  const requestedNewKey = new_key || (bodyKey && bodyKey !== key ? bodyKey : null);
 
   // Handle key renaming if requested
-  if (new_key && typeof new_key === 'string' && new_key.trim() !== key) {
-    const cleanNewKey = new_key.trim();
+  if (requestedNewKey && typeof requestedNewKey === 'string' && requestedNewKey.trim() !== key) {
+    const cleanNewKey = requestedNewKey.trim();
     if (!/^[A-Za-z0-9\-_]{3,64}$/.test(cleanNewKey)) {
       return res.status(400).json({ error: 'New license key must be 3-64 alphanumeric characters, dashes, or underscores' });
     }
