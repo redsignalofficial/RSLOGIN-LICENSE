@@ -358,18 +358,30 @@ function logValidation(entry) {
   try {
     let logs = [];
     if (fs.existsSync(LOGS_FILE)) {
-      logs = JSON.parse(fs.readFileSync(LOGS_FILE, 'utf8'));
+      try {
+        logs = JSON.parse(fs.readFileSync(LOGS_FILE, 'utf8'));
+      } catch (e) {
+        logs = [];
+      }
     }
 
-    // Collapse consecutive heartbeats from the same key and IP
-    if (logs.length > 0 &&
-        logs[0].key === entry.key &&
-        logs[0].ip === entry.ip &&
-        logs[0].valid === entry.valid) {
-      logs[0].timestamp = new Date().toISOString();
-      logs[0].count = (logs[0].count || 1) + 1;
-      if (entry.server_name) logs[0].server_name = entry.server_name;
-      if (entry.port) logs[0].port = entry.port;
+    const targetKey = (entry.key || 'UNKNOWN').trim();
+    const targetIp = (entry.ip || '').trim();
+
+    // Look for existing log from this server (matched by key and IP)
+    const existingIndex = logs.findIndex(l => (l.key || '').trim() === targetKey && (l.ip || '').trim() === targetIp);
+
+    if (existingIndex !== -1) {
+      const existing = logs[existingIndex];
+      const updated = {
+        ...existing,
+        ...entry,
+        count: (existing.count || 1) + 1,
+        timestamp: new Date().toISOString()
+      };
+      // Move updated server record to the top
+      logs.splice(existingIndex, 1);
+      logs.unshift(updated);
     } else {
       logs.unshift({
         ...entry,
@@ -378,7 +390,7 @@ function logValidation(entry) {
       });
     }
 
-    if (logs.length > 300) logs = logs.slice(0, 300);
+    if (logs.length > 200) logs = logs.slice(0, 200);
     fs.writeFileSync(LOGS_FILE, JSON.stringify(logs, null, 2), 'utf8');
   } catch (err) {
     // Non-critical
@@ -1211,21 +1223,26 @@ app.delete('/api/admin/banned-ips/:ip', requireAdmin, (req, res) => {
 
 function collapseLogs(rawLogs) {
   if (!Array.isArray(rawLogs) || rawLogs.length === 0) return [];
-  const collapsed = [];
+  const map = new Map();
   for (const item of rawLogs) {
-    const last = collapsed[collapsed.length - 1];
-    if (last && last.key === item.key && last.ip === item.ip && last.valid === item.valid) {
-      last.count = (last.count || 1) + (item.count || 1);
-      if (new Date(item.timestamp) > new Date(last.timestamp)) {
-        last.timestamp = item.timestamp;
-      }
-      if (item.server_name) last.server_name = item.server_name;
-      if (item.port) last.port = item.port;
+    const key = (item.key || 'UNKNOWN').trim();
+    const ip = (item.ip || '127.0.0.1').trim();
+    const serverId = `${key}@${ip}`;
+    if (!map.has(serverId)) {
+      map.set(serverId, { ...item, key, ip, count: item.count || 1 });
     } else {
-      collapsed.push({ ...item, count: item.count || 1 });
+      const existing = map.get(serverId);
+      existing.count = (existing.count || 1) + (item.count || 1);
+      if (!existing.timestamp || new Date(item.timestamp) > new Date(existing.timestamp)) {
+        existing.timestamp = item.timestamp;
+        existing.valid = item.valid;
+        if (item.reason) existing.reason = item.reason;
+        if (item.server_name) existing.server_name = item.server_name;
+        if (item.port) existing.port = item.port;
+      }
     }
   }
-  return collapsed;
+  return Array.from(map.values()).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 }
 
 // View validation logs
@@ -1253,6 +1270,14 @@ app.delete('/api/admin/logs', requireAdmin, (req, res) => {
 });
 
 // ---------------------- Start Server ----------------------
+try {
+  if (fs.existsSync(LOGS_FILE)) {
+    const raw = JSON.parse(fs.readFileSync(LOGS_FILE, 'utf8'));
+    const sanitized = collapseLogs(raw);
+    fs.writeFileSync(LOGS_FILE, JSON.stringify(sanitized, null, 2), 'utf8');
+  }
+} catch (e) {}
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`===============================================`);
   console.log(`🚀 RSLogin License Server online on port ${PORT}`);

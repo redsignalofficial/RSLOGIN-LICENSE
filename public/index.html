@@ -1140,27 +1140,41 @@
       renderLicensesTable(filtered);
     }
 
-    function renderRecentLogs() {
-      const tbody = document.getElementById('recent-logs-table');
-      if (!tbody) return;
-      const list = Array.isArray(globalLogs) ? globalLogs : [];
-
-      // Deduplicate incoming validations so repeated heartbeats from the same key/ip don't repeat row after row
-      const seen = new Map();
+    // Deduplicate logs strictly: ONE row per server (Key + IP)
+    function deduplicateServerLogs(list) {
+      if (!Array.isArray(list)) return [];
+      const map = new Map();
       for (const log of list) {
-        const id = `${log.key || ''}__${log.ip || ''}__${log.valid}`;
-        if (!seen.has(id)) {
-          seen.set(id, { ...log, totalCount: log.count || 1 });
+        const key = (log.key || 'UNKNOWN').trim();
+        const ip = (log.ip || '—').trim();
+        const serverKey = `${key}@${ip}`;
+
+        if (!map.has(serverKey)) {
+          map.set(serverKey, {
+            ...log,
+            key,
+            ip,
+            totalRequests: log.count || 1
+          });
         } else {
-          const entry = seen.get(id);
-          entry.totalCount += (log.count || 1);
-          if (new Date(log.timestamp) > new Date(entry.timestamp)) {
+          const entry = map.get(serverKey);
+          entry.totalRequests += (log.count || 1);
+          if (!entry.timestamp || new Date(log.timestamp) > new Date(entry.timestamp)) {
             entry.timestamp = log.timestamp;
+            entry.valid = log.valid;
+            if (log.reason) entry.reason = log.reason;
+            if (log.server_name) entry.server_name = log.server_name;
+            if (log.port) entry.port = log.port;
           }
         }
       }
+      return Array.from(map.values()).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    }
 
-      const deduplicated = Array.from(seen.values()).slice(0, 8);
+    function renderRecentLogs() {
+      const tbody = document.getElementById('recent-logs-table');
+      if (!tbody) return;
+      const deduplicated = deduplicateServerLogs(globalLogs).slice(0, 8);
 
       if (deduplicated.length === 0) {
         tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-8 text-center text-slate-500">No requests recorded yet.</td></tr>';
@@ -1168,8 +1182,8 @@
       }
 
       tbody.innerHTML = deduplicated.map(log => {
-        const countBadge = (log.totalCount > 1)
-          ? `<span class="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-brand/15 text-brand border border-brand/30" title="${log.totalCount} validation requests">${log.totalCount}×</span>`
+        const countBadge = (log.totalRequests > 1)
+          ? `<span class="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-brand/15 text-brand border border-brand/30" title="${log.totalRequests} validation requests">${log.totalRequests}×</span>`
           : '';
 
         const statusBadge = log.valid
@@ -1181,14 +1195,18 @@
         return `
           <tr class="hover:bg-surface-subtle/50 transition-colors">
             <td class="px-4 py-3 text-slate-400 font-mono text-[11px] whitespace-nowrap">
-              <div class="flex items-center gap-1">
+              <div class="flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full ${log.valid ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}"></span>
                 <span>${timeStr}</span>
                 ${countBadge}
               </div>
             </td>
             <td class="px-4 py-3">
-              <div class="font-mono text-xs text-white truncate max-w-[150px]" title="${escapeHtml(log.key || '')}">${escapeHtml(log.key || '—')}</div>
-              <div class="font-mono text-[10px] text-slate-500">${escapeHtml(log.ip || '—')}</div>
+              <div class="font-mono text-xs font-semibold text-white truncate max-w-[150px]" title="${escapeHtml(log.key)}">${escapeHtml(log.key)}</div>
+              <div class="font-mono text-[10px] text-slate-400 flex items-center gap-1">
+                <span>${escapeHtml(log.ip)}</span>
+                ${log.server_name ? `<span class="text-brand-cyan/80">(${escapeHtml(log.server_name)})</span>` : ''}
+              </div>
             </td>
             <td class="px-4 py-3">${statusBadge}</td>
             <td class="px-4 py-3 text-right">
@@ -1366,33 +1384,19 @@
       }).join('');
     }
 
-    // Full Audit Logs Table
+    // Full Audit Logs Table - Strictly ONE row per server node
     function renderFullLogs() {
       const tbody = document.getElementById('full-logs-table-body');
       if (!tbody) return;
-      const list = Array.isArray(globalLogs) ? globalLogs : [];
-      if (list.length === 0) {
+      const deduplicated = deduplicateServerLogs(globalLogs);
+      if (deduplicated.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-slate-500">No logs recorded yet.</td></tr>';
         return;
       }
 
-      // Group consecutive repeated heartbeats from the same key/ip so the audit log isn't spammed with duplicates
-      const collapsed = [];
-      for (const log of list) {
-        const last = collapsed[collapsed.length - 1];
-        if (last && last.key === log.key && last.ip === log.ip && last.valid === log.valid) {
-          last.count = (last.count || 1) + (log.count || 1);
-          if (new Date(log.timestamp) > new Date(last.timestamp)) {
-            last.timestamp = log.timestamp;
-          }
-        } else {
-          collapsed.push({ ...log, count: log.count || 1 });
-        }
-      }
-
-      tbody.innerHTML = collapsed.map(log => {
-        const countBadge = (log.count > 1)
-          ? `<span class="ml-2 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-brand/15 text-brand border border-brand/30" title="${log.count} validations collapsed">${log.count}×</span>`
+      tbody.innerHTML = deduplicated.map(log => {
+        const countBadge = (log.totalRequests > 1)
+          ? `<span class="ml-2 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-brand/15 text-brand border border-brand/30" title="${log.totalRequests} validations recorded">${log.totalRequests}×</span>`
           : '';
 
         const statusBadge = log.valid
@@ -1408,8 +1412,8 @@
               ${countBadge}
             </td>
             <td class="px-6 py-3.5 font-mono text-white text-xs">${escapeHtml(log.key || '—')}</td>
-            <td class="px-6 py-3.5 font-mono text-slate-400 text-xs">${escapeHtml(log.ip || '—')}</td>
-            <td class="px-6 py-3.5 text-slate-300 text-xs">${escapeHtml(log.product || 'plugin')}</td>
+            <td class="px-6 py-3.5 font-mono text-slate-400 text-xs">${escapeHtml(log.ip || '—')}${log.port ? ':' + log.port : ''}</td>
+            <td class="px-6 py-3.5 text-slate-300 text-xs">${escapeHtml(log.server_name || log.product || 'plugin')}</td>
             <td class="px-6 py-3.5">${statusBadge}</td>
             <td class="px-6 py-3.5 text-right">
               ${log.ip && log.ip !== '127.0.0.1' ? `
