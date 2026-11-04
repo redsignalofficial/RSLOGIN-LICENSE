@@ -986,20 +986,33 @@
       if (icon) icon.classList.add('animate-spin');
 
       try {
-        const [licRes, logRes, banRes] = await Promise.all([
+        const [licRes, logRes, banRes, conRes] = await Promise.all([
           fetch('/api/admin/licenses', { headers: { 'Authorization': `Bearer ${token}` } }),
           fetch('/api/admin/logs', { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch('/api/admin/banned-ips', { headers: { 'Authorization': `Bearer ${token}` } })
+          fetch('/api/admin/banned-ips', { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch('/api/admin/console/logs', { headers: { 'Authorization': `Bearer ${token}` } })
         ]);
 
-        if (licRes.status === 401 || logRes.status === 401) {
+        if (licRes.status === 401 || licRes.status === 403 || logRes.status === 401) {
           handleLogout(true, 'Session expired. Please log in again.');
           return;
         }
 
-        if (licRes.ok) globalLicenses = await licRes.json();
-        if (logRes.ok) globalLogs = await logRes.json();
-        if (banRes.ok) globalBannedIps = await banRes.json();
+        const licData = licRes.ok ? await licRes.json().catch(() => ({})) : {};
+        const logData = logRes.ok ? await logRes.json().catch(() => ({})) : {};
+        const banData = banRes.ok ? await banRes.json().catch(() => ({})) : {};
+        const conData = (conRes && conRes.ok) ? await conRes.json().catch(() => ({})) : {};
+
+        globalLicenses = Array.isArray(licData) ? licData : (licData.licenses || []);
+        globalLogs = Array.isArray(logData) ? logData : (logData.logs || []);
+        globalBannedIps = Array.isArray(banData) ? banData : (banData.banned_ips || []);
+
+        if (conData && conData.metrics) {
+          const memEl = document.getElementById('telemetry-mem');
+          const upEl = document.getElementById('telemetry-uptime');
+          if (memEl && conData.metrics.memory_rss_mb) memEl.innerText = `RAM: ${conData.metrics.memory_rss_mb} MB`;
+          if (upEl && conData.metrics.uptime) upEl.innerText = `UPTIME: ${formatSeconds(conData.metrics.uptime)}`;
+        }
 
         renderStats();
         renderLicensesTable(globalLicenses);
@@ -1016,38 +1029,46 @@
 
     // Overview Stats
     function renderStats() {
-      const total = globalLicenses.length;
-      const active = globalLicenses.filter(l => l.status === 'ACTIVE').length;
+      const list = Array.isArray(globalLicenses) ? globalLicenses : [];
+      const total = list.length;
+      const active = list.filter(l => l && l.status === 'ACTIVE').length;
       
       let totalConnectedServers = 0;
-      globalLicenses.forEach(l => {
-        if (l.servers) {
+      list.forEach(l => {
+        if (l && l.servers) {
           totalConnectedServers += Object.keys(l.servers).length;
         }
       });
 
-      document.getElementById('stat-total').innerText = total;
-      document.getElementById('stat-active').innerText = active;
-      document.getElementById('stat-servers').innerText = totalConnectedServers;
-      document.getElementById('stat-banned').innerText = globalBannedIps.length;
+      const statTotal = document.getElementById('stat-total');
+      const statActive = document.getElementById('stat-active');
+      const statServers = document.getElementById('stat-servers');
+      const statBanned = document.getElementById('stat-banned');
+
+      if (statTotal) statTotal.innerText = total;
+      if (statActive) statActive.innerText = active;
+      if (statServers) statServers.innerText = totalConnectedServers;
+      if (statBanned) statBanned.innerText = Array.isArray(globalBannedIps) ? globalBannedIps.length : 0;
     }
 
     // Licenses Table
     function renderLicensesTable(licenses) {
       const tbody = document.getElementById('licenses-table-body');
-      if (!licenses || licenses.length === 0) {
+      if (!tbody) return;
+      const list = Array.isArray(licenses) ? licenses : [];
+      if (list.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-slate-500">No licenses found.</td></tr>';
         return;
       }
 
-      tbody.innerHTML = licenses.map(lic => {
-        const serverCount = lic.servers ? Object.keys(lic.servers).length : 0;
-        const maxServers = (lic.max_servers && lic.max_servers > 0) ? lic.max_servers : '∞';
-        const statusBadge = lic.status === 'ACTIVE'
+      tbody.innerHTML = list.map(lic => {
+        const serverCount = (lic && lic.servers) ? Object.keys(lic.servers).length : 0;
+        const maxServers = (lic && lic.max_servers && lic.max_servers > 0) ? lic.max_servers : '∞';
+        const statusBadge = (lic && lic.status === 'ACTIVE')
           ? '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-mono"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> ACTIVE</span>'
           : '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 font-mono">SUSPENDED</span>';
 
-        const tierBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-surface-subtle text-slate-300 border border-surface-border font-mono">${lic.tier || 'STANDARD'}</span>`;
+        const tierBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-surface-subtle text-slate-300 border border-surface-border font-mono">${(lic && lic.tier) || 'STANDARD'}</span>`;
 
         return `
           <tr class="hover:bg-surface-subtle/50 transition-colors">
@@ -1109,7 +1130,9 @@
 
     function renderRecentLogs() {
       const tbody = document.getElementById('recent-logs-table');
-      const recent = globalLogs.slice(0, 6);
+      if (!tbody) return;
+      const list = Array.isArray(globalLogs) ? globalLogs : [];
+      const recent = list.slice(0, 6);
 
       if (recent.length === 0) {
         tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-8 text-center text-slate-500">No requests recorded yet.</td></tr>';
@@ -1168,15 +1191,18 @@
       const tbody = document.getElementById('all-servers-table-body');
       const overviewTbody = document.getElementById('overview-servers-table-body');
       const serverList = [];
+      const list = Array.isArray(globalLicenses) ? globalLicenses : [];
 
-      globalLicenses.forEach(lic => {
-        if (lic.servers) {
+      list.forEach(lic => {
+        if (lic && lic.servers) {
           Object.values(lic.servers).forEach(srv => {
-            serverList.push({
-              ...srv,
-              license_key: lic.key,
-              owner: lic.owner
-            });
+            if (srv) {
+              serverList.push({
+                ...srv,
+                license_key: lic.key,
+                owner: lic.owner
+              });
+            }
           });
         }
       });
@@ -1279,12 +1305,14 @@
     // Banned IPs Table
     function renderBannedIps() {
       const tbody = document.getElementById('banned-ips-table-body');
-      if (!globalBannedIps || globalBannedIps.length === 0) {
+      if (!tbody) return;
+      const list = Array.isArray(globalBannedIps) ? globalBannedIps : [];
+      if (list.length === 0) {
         tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-8 text-center text-slate-500">No banned IPs. The blacklist is empty.</td></tr>';
         return;
       }
 
-      tbody.innerHTML = globalBannedIps.map(item => {
+      tbody.innerHTML = list.map(item => {
         const dateStr = item.banned_at ? new Date(item.banned_at).toLocaleString() : '—';
         return `
           <tr class="hover:bg-surface-subtle/50 transition-colors">
@@ -1304,12 +1332,14 @@
     // Full Audit Logs Table
     function renderFullLogs() {
       const tbody = document.getElementById('full-logs-table-body');
-      if (!globalLogs || globalLogs.length === 0) {
+      if (!tbody) return;
+      const list = Array.isArray(globalLogs) ? globalLogs : [];
+      if (list.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-slate-500">No logs recorded yet.</td></tr>';
         return;
       }
 
-      tbody.innerHTML = globalLogs.map(log => {
+      tbody.innerHTML = list.map(log => {
         const statusBadge = log.valid
           ? '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-mono">ALLOWED</span>'
           : `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30 font-mono">${escapeHtml(log.reason || 'DENIED')}</span>`;
