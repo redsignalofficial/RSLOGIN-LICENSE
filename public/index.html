@@ -4,7 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RSLogin — License Center</title>
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <link rel="alternate icon" href="/favicon.ico">
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2/src/bold/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2/src/regular/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -94,8 +99,8 @@
       <div class="absolute -bottom-16 -right-16 w-32 h-32 bg-brand-cyan/20 rounded-full blur-3xl pointer-events-none"></div>
 
       <div class="flex items-center gap-3.5 mb-6">
-        <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-brand to-rose-600 flex items-center justify-center text-white shadow-lg shadow-brand/25">
-          <i class="ph-bold ph-shield-check text-2xl"></i>
+        <div class="w-12 h-12 rounded-xl bg-surface-card p-1 flex items-center justify-center shadow-lg shadow-brand/20 border border-brand/40 overflow-hidden">
+          <img src="/icon.svg" alt="RSLogin Logo" class="w-full h-full object-contain" onerror="this.onerror=null; this.src='/logo.svg';" />
         </div>
         <div>
           <div class="flex items-center gap-2">
@@ -144,8 +149,8 @@
           
           <!-- Brand Logo -->
           <div class="flex items-center gap-3 shrink-0">
-            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand to-rose-600 flex items-center justify-center text-white shadow-md shadow-brand/25">
-              <i class="ph-bold ph-shield-check text-xl"></i>
+            <div class="w-9 h-9 rounded-xl bg-surface-card p-0.5 flex items-center justify-center shadow-md shadow-brand/20 border border-brand/30 overflow-hidden">
+              <img src="/icon.svg" alt="RSLogin Logo" class="w-full h-full object-contain" onerror="this.onerror=null; this.src='/logo.svg';" />
             </div>
             <div>
               <div class="flex items-center gap-2">
@@ -1139,14 +1144,34 @@
       const tbody = document.getElementById('recent-logs-table');
       if (!tbody) return;
       const list = Array.isArray(globalLogs) ? globalLogs : [];
-      const recent = list.slice(0, 6);
 
-      if (recent.length === 0) {
+      // Deduplicate incoming validations so repeated heartbeats from the same key/ip don't repeat row after row
+      const seen = new Map();
+      for (const log of list) {
+        const id = `${log.key || ''}__${log.ip || ''}__${log.valid}`;
+        if (!seen.has(id)) {
+          seen.set(id, { ...log, totalCount: log.count || 1 });
+        } else {
+          const entry = seen.get(id);
+          entry.totalCount += (log.count || 1);
+          if (new Date(log.timestamp) > new Date(entry.timestamp)) {
+            entry.timestamp = log.timestamp;
+          }
+        }
+      }
+
+      const deduplicated = Array.from(seen.values()).slice(0, 8);
+
+      if (deduplicated.length === 0) {
         tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-8 text-center text-slate-500">No requests recorded yet.</td></tr>';
         return;
       }
 
-      tbody.innerHTML = recent.map(log => {
+      tbody.innerHTML = deduplicated.map(log => {
+        const countBadge = (log.totalCount > 1)
+          ? `<span class="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-brand/15 text-brand border border-brand/30" title="${log.totalCount} validation requests">${log.totalCount}×</span>`
+          : '';
+
         const statusBadge = log.valid
           ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 font-mono">ALLOWED</span>'
           : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 font-mono" title="${escapeHtml(log.reason || '')}">DENIED</span>`;
@@ -1155,15 +1180,20 @@
 
         return `
           <tr class="hover:bg-surface-subtle/50 transition-colors">
-            <td class="px-4 py-3 text-slate-400 font-mono text-[11px]">${timeStr}</td>
+            <td class="px-4 py-3 text-slate-400 font-mono text-[11px] whitespace-nowrap">
+              <div class="flex items-center gap-1">
+                <span>${timeStr}</span>
+                ${countBadge}
+              </div>
+            </td>
             <td class="px-4 py-3">
-              <div class="font-mono text-xs text-white truncate max-w-[140px]" title="${log.key || ''}">${log.key || '—'}</div>
-              <div class="font-mono text-[10px] text-slate-500">${log.ip || '—'}</div>
+              <div class="font-mono text-xs text-white truncate max-w-[150px]" title="${escapeHtml(log.key || '')}">${escapeHtml(log.key || '—')}</div>
+              <div class="font-mono text-[10px] text-slate-500">${escapeHtml(log.ip || '—')}</div>
             </td>
             <td class="px-4 py-3">${statusBadge}</td>
             <td class="px-4 py-3 text-right">
               ${log.ip && log.ip !== '127.0.0.1' ? `
-                <button onclick="promptBanIp('${log.ip}')" class="text-[11px] text-rose-400 hover:text-rose-300 font-bold hover:underline">Ban</button>
+                <button onclick="promptBanIp('${escapeAttr(log.ip)}')" class="text-[11px] text-rose-400 hover:text-rose-300 font-bold hover:underline">Ban</button>
               ` : '—'}
             </td>
           </tr>
@@ -1346,7 +1376,25 @@
         return;
       }
 
-      tbody.innerHTML = list.map(log => {
+      // Group consecutive repeated heartbeats from the same key/ip so the audit log isn't spammed with duplicates
+      const collapsed = [];
+      for (const log of list) {
+        const last = collapsed[collapsed.length - 1];
+        if (last && last.key === log.key && last.ip === log.ip && last.valid === log.valid) {
+          last.count = (last.count || 1) + (log.count || 1);
+          if (new Date(log.timestamp) > new Date(last.timestamp)) {
+            last.timestamp = log.timestamp;
+          }
+        } else {
+          collapsed.push({ ...log, count: log.count || 1 });
+        }
+      }
+
+      tbody.innerHTML = collapsed.map(log => {
+        const countBadge = (log.count > 1)
+          ? `<span class="ml-2 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-brand/15 text-brand border border-brand/30" title="${log.count} validations collapsed">${log.count}×</span>`
+          : '';
+
         const statusBadge = log.valid
           ? '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-mono">ALLOWED</span>'
           : `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30 font-mono">${escapeHtml(log.reason || 'DENIED')}</span>`;
@@ -1355,14 +1403,17 @@
 
         return `
           <tr class="hover:bg-surface-subtle/50 transition-colors">
-            <td class="px-6 py-3.5 text-slate-400 font-mono text-xs">${dateStr}</td>
-            <td class="px-6 py-3.5 font-mono text-white text-xs">${log.key || '—'}</td>
-            <td class="px-6 py-3.5 font-mono text-slate-400 text-xs">${log.ip || '—'}</td>
+            <td class="px-6 py-3.5 text-slate-400 font-mono text-xs whitespace-nowrap">
+              ${dateStr}
+              ${countBadge}
+            </td>
+            <td class="px-6 py-3.5 font-mono text-white text-xs">${escapeHtml(log.key || '—')}</td>
+            <td class="px-6 py-3.5 font-mono text-slate-400 text-xs">${escapeHtml(log.ip || '—')}</td>
             <td class="px-6 py-3.5 text-slate-300 text-xs">${escapeHtml(log.product || 'plugin')}</td>
             <td class="px-6 py-3.5">${statusBadge}</td>
             <td class="px-6 py-3.5 text-right">
               ${log.ip && log.ip !== '127.0.0.1' ? `
-                <button onclick="promptBanIp('${log.ip}')" class="text-xs text-rose-400 hover:text-rose-300 font-bold hover:underline">Ban IP</button>
+                <button onclick="promptBanIp('${escapeAttr(log.ip)}')" class="text-xs text-rose-400 hover:text-rose-300 font-bold hover:underline">Ban IP</button>
               ` : '—'}
             </td>
           </tr>

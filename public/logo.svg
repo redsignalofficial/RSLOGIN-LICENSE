@@ -1,0 +1,296 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 450" width="940" height="450">
+  <defs>
+    <!-- Background Gradients -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#070913" />
+      <stop offset="40%" stop-color="#0B1021" />
+      <stop offset="100%" stop-color="#05070E" />
+    </linearGradient>
+    <linearGradient id="borderGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF2D55" stop-opacity="0.8" />
+      <stop offset="30%" stop-color="#38BDF8" stop-opacity="0.2" />
+      <stop offset="70%" stop-color="#00F7FF" stop-opacity="0.7" />
+      <stop offset="100%" stop-color="#1E293B" stop-opacity="0.4" />
+    </linearGradient>
+
+    <!-- Ambient Lights -->
+    <radialGradient id="cyanAura" cx="30%" cy="50%" r="45%">
+      <stop offset="0%" stop-color="#00F7FF" stop-opacity="0.22" />
+      <stop offset="60%" stop-color="#0077FF" stop-opacity="0.08" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="redAura" cx="80%" cy="30%" r="40%">
+      <stop offset="0%" stop-color="#FF2D55" stop-opacity="0.18" />
+      <stop offset="70%" stop-color="#800020" stop-opacity="0.04" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="boltCoreGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00F7FF" stop-opacity="0.9" />
+      <stop offset="40%" stop-color="#0099FF" stop-opacity="0.4" />
+      <stop offset="100%" stop-color="#001144" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Isometric Cube Lighting -->
+    <linearGradient id="cubeTop" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E2945" />
+      <stop offset="50%" stop-color="#141C33" />
+      <stop offset="100%" stop-color="#0D1324" />
+    </linearGradient>
+    <linearGradient id="cubeLeft" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#2D0B16" />
+      <stop offset="40%" stop-color="#1E070F" />
+      <stop offset="100%" stop-color="#120409" />
+    </linearGradient>
+    <linearGradient id="cubeRight" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0E1E3D" />
+      <stop offset="50%" stop-color="#091326" />
+      <stop offset="100%" stop-color="#050B17" />
+    </linearGradient>
+    <linearGradient id="cubeBevel" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#475569" />
+      <stop offset="50%" stop-color="#1E293B" />
+      <stop offset="100%" stop-color="#0F172A" />
+    </linearGradient>
+
+    <!-- Lightning Bolt Gradient -->
+    <linearGradient id="boltGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="25%" stop-color="#A5F3FC" />
+      <stop offset="60%" stop-color="#00E5FF" />
+      <stop offset="100%" stop-color="#0066FF" />
+    </linearGradient>
+
+    <!-- Typography Gradients -->
+    <linearGradient id="rsGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FF3355" />
+      <stop offset="100%" stop-color="#FF6B8B" />
+    </linearGradient>
+    <linearGradient id="loginGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00F7FF" />
+      <stop offset="60%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#3B82F6" />
+    </linearGradient>
+    <linearGradient id="pillGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FF2D55" />
+      <stop offset="100%" stop-color="#0077FE" />
+    </linearGradient>
+    <linearGradient id="lineAccent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FF2D55" stop-opacity="0.9" />
+      <stop offset="35%" stop-color="#00F7FF" stop-opacity="0.9" />
+      <stop offset="70%" stop-color="#38BDF8" stop-opacity="0.5" />
+      <stop offset="100%" stop-color="#1E293B" stop-opacity="0" />
+    </linearGradient>
+    <linearGradient id="glassChip" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B" stop-opacity="0.7" />
+      <stop offset="100%" stop-color="#0F172A" stop-opacity="0.5" />
+    </linearGradient>
+
+    <!-- Filters -->
+    <filter id="neonGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur1" />
+      <feGaussianBlur stdDeviation="16" result="blur2" />
+      <feMerge>
+        <feMergeNode in="blur2" />
+        <feMergeNode in="blur1" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter id="textGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComponentTransfer in="blur" result="glow">
+        <feFuncA type="linear" slope="0.5" />
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode in="glow" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000000" flood-opacity="0.65" />
+    </filter>
+    <filter id="badgeShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#00F7FF" flood-opacity="0.3" />
+    </filter>
+
+    <!-- Clip Paths for Isometric Cube -->
+    <clipPath id="clipTop">
+      <polygon points="200,52 340,131 200,210 60,131" />
+    </clipPath>
+    <clipPath id="clipLeft">
+      <polygon points="60,131 200,210 200,378 60,299" />
+    </clipPath>
+    <clipPath id="clipRight">
+      <polygon points="200,210 340,131 340,299 200,378" />
+    </clipPath>
+  </defs>
+
+  <!-- Card Background -->
+  <rect width="940" height="450" rx="20" fill="url(#bgGradient)" />
+  <rect width="940" height="450" rx="20" fill="none" stroke="url(#borderGradient)" stroke-width="2" />
+
+  <!-- Ambient Glow Layers -->
+  <rect width="940" height="450" rx="20" fill="url(#cyanAura)" />
+  <rect width="940" height="450" rx="20" fill="url(#redAura)" />
+
+  <!-- Subtle Perspective Background Grid Lines -->
+  <g stroke="#1E2A4A" stroke-width="1" opacity="0.25">
+    <line x1="40" y1="40" x2="400" y2="410" />
+    <line x1="120" y1="40" x2="480" y2="410" />
+    <line x1="200" y1="40" x2="560" y2="410" />
+    <line x1="420" y1="80" x2="900" y2="80" />
+    <line x1="420" y1="160" x2="900" y2="160" />
+    <line x1="420" y1="240" x2="900" y2="240" />
+    <line x1="420" y1="320" x2="900" y2="320" />
+    <line x1="420" y1="400" x2="900" y2="400" />
+  </g>
+
+  <!-- ==================== LEFT: ISOMETRIC EMBLEM ==================== -->
+  <g filter="url(#dropShadow)">
+    <!-- Outer Shield / Hex Bevel Frame -->
+    <polygon points="200,30 362,123 362,307 200,400 38,307 38,123" fill="#090E1D" />
+    <polygon points="200,30 362,123 362,307 200,400 38,307 38,123" fill="none" stroke="url(#cubeBevel)" stroke-width="8" stroke-linejoin="round" />
+    <polygon points="200,38 354,127 354,303 200,392 46,303 46,127" fill="none" stroke="#00F7FF" stroke-width="1.5" opacity="0.6" />
+
+    <!-- Isometric Minecraft Cube - TOP FACE -->
+    <polygon points="200,52 340,131 200,210 60,131" fill="url(#cubeTop)" />
+    <!-- Grid circuitry on top face -->
+    <g clip-path="url(#clipTop)" opacity="0.6" stroke="#00F7FF" stroke-width="1.5">
+      <line x1="130" y1="91" x2="270" y2="171" />
+      <line x1="95" y1="111" x2="235" y2="191" />
+      <line x1="165" y1="71" x2="305" y2="151" />
+      <line x1="270" y1="91" x2="130" y2="171" />
+      <line x1="235" y1="71" x2="95" y2="151" />
+      <line x1="305" y1="111" x2="165" y2="191" />
+    </g>
+
+    <!-- Isometric Minecraft Cube - LEFT FACE (Signal Red Theme) -->
+    <polygon points="60,131 200,210 200,378 60,299" fill="url(#cubeLeft)" />
+    <!-- Circuit lines on left face -->
+    <g clip-path="url(#clipLeft)" opacity="0.65">
+      <path d="M70,160 L140,200 L140,280 L190,310" fill="none" stroke="#FF2D55" stroke-width="2" />
+      <path d="M100,250 L160,285 L160,345" fill="none" stroke="#FF2D55" stroke-width="1.5" stroke-dasharray="6,4" />
+      <circle cx="140" cy="200" r="3" fill="#FF88A3" />
+      <circle cx="190" cy="310" r="3.5" fill="#FFFFFF" />
+    </g>
+
+    <!-- Isometric Minecraft Cube - RIGHT FACE (Azure Theme) -->
+    <polygon points="200,210 340,131 340,299 200,378" fill="url(#cubeRight)" />
+    <!-- Circuit lines on right face -->
+    <g clip-path="url(#clipRight)" opacity="0.65">
+      <path d="M330,160 L260,200 L260,280 L210,310" fill="none" stroke="#00F7FF" stroke-width="2" />
+      <path d="M300,250 L240,285 L240,345" fill="none" stroke="#38BDF8" stroke-width="1.5" stroke-dasharray="6,4" />
+      <circle cx="260" cy="200" r="3" fill="#A5F3FC" />
+      <circle cx="210" cy="310" r="3.5" fill="#FFFFFF" />
+    </g>
+
+    <!-- Glowing Corner Edges -->
+    <path d="M60,131 L200,210 L340,131 M200,210 L200,378" fill="none" stroke="#00F7FF" stroke-width="2.5" opacity="0.8" filter="url(#neonGlow)" />
+  </g>
+
+  <!-- Ambient Lightning Aura -->
+  <circle cx="205" cy="210" r="90" fill="url(#boltCoreGlow)" opacity="0.45" />
+
+  <!-- DYNAMIC LIGHTNING BOLT -->
+  <g filter="url(#neonGlow)">
+    <polygon points="234,36 274,36 236,162 292,162 144,392 174,244 114,244" fill="url(#boltGradient)" stroke="#00F7FF" stroke-width="3" stroke-linejoin="round" />
+  </g>
+  <!-- Core White Flash inside Bolt -->
+  <polygon points="242,50 260,50 224,172 266,172 168,328 184,234 136,234" fill="#FFFFFF" opacity="0.9" />
+
+  <!-- Electric Energy Sparks -->
+  <g stroke="#00F7FF" stroke-width="2" stroke-linecap="round" opacity="0.85">
+    <path d="M120,290 L102,302" />
+    <path d="M285,120 L305,112" />
+    <path d="M280,225 L300,230" />
+    <path d="M150,140 L135,130" />
+  </g>
+
+  <!-- HOLOGRAPHIC SECURITY LOCK BADGE -->
+  <g transform="translate(254,286)" filter="url(#badgeShadow)">
+    <circle cx="36" cy="36" r="34" fill="#0A1124" stroke="#00F7FF" stroke-width="3" />
+    <circle cx="36" cy="36" r="28" fill="none" stroke="#1E3A8A" stroke-width="1.5" stroke-dasharray="4,3" />
+    <!-- Shackle -->
+    <path d="M24,34 V25 A12,12 0 0 1 48,25 V34" fill="none" stroke="#E2E8F0" stroke-width="5" stroke-linecap="round" />
+    <!-- Lock Body -->
+    <rect x="20" y="33" width="32" height="24" rx="5" fill="#FF2D55" />
+    <rect x="20" y="33" width="32" height="4" rx="2" fill="#FFA5B5" opacity="0.6" />
+    <!-- Keyhole -->
+    <circle cx="36" cy="43" r="3.5" fill="#FFFFFF" />
+    <polygon points="34.5,43 37.5,43 38.5,50 33.5,50" fill="#FFFFFF" />
+  </g>
+
+
+  <!-- ==================== RIGHT: BRANDING & TYPOGRAPHY ==================== -->
+
+  <!-- Top Pill / Status Tag -->
+  <g transform="translate(424, 76)">
+    <rect width="112" height="28" rx="14" fill="url(#pillGradient)" />
+    <text x="56" y="19" text-anchor="middle" font-family="system-ui, -apple-system, 'Inter', sans-serif" font-size="12" font-weight="900" letter-spacing="2" fill="#FFFFFF">PREMIUM</text>
+
+    <!-- Version Pill -->
+    <rect x="122" y="0" width="80" height="28" rx="14" fill="url(#glassChip)" stroke="#334155" stroke-width="1" />
+    <text x="162" y="18" text-anchor="middle" font-family="'JetBrains Mono', Consolas, monospace" font-size="12" font-weight="700" fill="#38BDF8">v1.4.3</text>
+
+    <!-- Platform Pill -->
+    <rect x="210" y="0" width="168" height="28" rx="14" fill="url(#glassChip)" stroke="#334155" stroke-width="1" />
+    <circle cx="224" cy="14" r="4" fill="#10B981" />
+    <text x="296" y="18" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#E2E8F0">UNIVERSAL CORE</text>
+  </g>
+
+  <!-- MAIN LOGO TITLE: RSLogin -->
+  <g transform="translate(422, 175)" filter="url(#textGlow)">
+    <text font-family="system-ui, -apple-system, 'Segoe UI', 'Inter', sans-serif" font-weight="900" font-style="italic" font-size="88" letter-spacing="-1">
+      <tspan fill="url(#rsGradient)">RS</tspan>
+      <tspan fill="url(#loginGradient)">Login</tspan>
+    </text>
+  </g>
+
+  <!-- Accent Divider Line with Center Diamond -->
+  <g transform="translate(424, 202)">
+    <rect width="450" height="3" rx="1.5" fill="url(#lineAccent)" />
+    <polygon points="120,-3 126,1.5 120,6 114,1.5" fill="#00F7FF" filter="url(#neonGlow)" />
+  </g>
+
+  <!-- Tagline & Description -->
+  <g transform="translate(424, 238)">
+    <text font-family="system-ui, -apple-system, 'Segoe UI', 'Inter', sans-serif" font-size="21" font-weight="700" fill="#F8FAFC" letter-spacing="0.5">
+      Universal Minecraft Authentication &amp; Security
+    </text>
+    <text y="28" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="500" fill="#94A3B8">
+      Instant Mojang Premium &amp; Bedrock Floodgate Auto-Login
+    </text>
+  </g>
+
+  <!-- FEATURE CHIPS (Row of 3 high-tech badges) -->
+  <g transform="translate(424, 305)">
+    <!-- Chip 1: Universal Platform -->
+    <g transform="translate(0, 0)">
+      <rect width="142" height="34" rx="8" fill="url(#glassChip)" stroke="#1E3A8A" stroke-width="1.5" />
+      <path d="M15,10 L22,10 L18,17 L24,17 L14,28 L16,19 L11,19 Z" fill="#38BDF8" />
+      <text x="32" y="21" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#E2E8F0">Paper • Folia • Vel</text>
+    </g>
+
+    <!-- Chip 2: Cryptography -->
+    <g transform="translate(152, 0)">
+      <rect width="150" height="34" rx="8" fill="url(#glassChip)" stroke="#831843" stroke-width="1.5" />
+      <rect x="12" y="16" width="12" height="10" rx="2" fill="#FF2D55" />
+      <path d="M14,16 V13 A4,4 0 0 1 22,13 V16" fill="none" stroke="#FFA5B5" stroke-width="2" />
+      <text x="32" y="21" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#E2E8F0">Argon2id &amp; TOTP</text>
+    </g>
+
+    <!-- Chip 3: Bedrock -->
+    <g transform="translate(312, 0)">
+      <rect width="138" height="34" rx="8" fill="url(#glassChip)" stroke="#065F46" stroke-width="1.5" />
+      <polygon points="18,11 24,18 18,25 12,18" fill="#10B981" />
+      <text x="32" y="21" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#E2E8F0">Bedrock Bypass</text>
+    </g>
+  </g>
+
+  <!-- FOOTER ATTRIBUTION -->
+  <g transform="translate(424, 395)">
+    <circle cx="6" cy="6" r="4" fill="#00F7FF" filter="url(#neonGlow)" />
+    <text x="20" y="10" font-family="'JetBrains Mono', Consolas, monospace" font-size="12" font-weight="600" fill="#64748B" letter-spacing="0.5">
+      ENGINEERED BY <tspan fill="#CBD5E1" font-weight="700">RED SIGNAL</tspan> &amp; <tspan fill="#38BDF8" font-weight="700">RinDevelopment</tspan>
+    </text>
+  </g>
+</svg>

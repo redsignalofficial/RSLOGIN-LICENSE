@@ -31,9 +31,9 @@ app.use((req, res, next) => {
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   res.setHeader('Content-Security-Policy', [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://unpkg.com",
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' https://fonts.gstatic.com data:",
+    "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com",
+    "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com data:",
     "img-src 'self' data: https:",
     "connect-src 'self' https: wss:",
     "object-src 'none'",
@@ -71,6 +71,15 @@ app.use((req, res, next) => {
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/favicon.ico', (req, res) => {
+  const iconPath = path.join(__dirname, 'public', 'icon.svg');
+  if (fs.existsSync(iconPath)) {
+    res.setHeader('Content-Type', 'image/svg+xml');
+    return res.sendFile(iconPath);
+  }
+  res.status(204).end();
+});
 
 // ---------------------- Security Helpers & Cryptographic Guards ----------------------
 
@@ -351,10 +360,24 @@ function logValidation(entry) {
     if (fs.existsSync(LOGS_FILE)) {
       logs = JSON.parse(fs.readFileSync(LOGS_FILE, 'utf8'));
     }
-    logs.unshift({
-      ...entry,
-      timestamp: new Date().toISOString()
-    });
+
+    // Collapse consecutive heartbeats from the same key and IP
+    if (logs.length > 0 &&
+        logs[0].key === entry.key &&
+        logs[0].ip === entry.ip &&
+        logs[0].valid === entry.valid) {
+      logs[0].timestamp = new Date().toISOString();
+      logs[0].count = (logs[0].count || 1) + 1;
+      if (entry.server_name) logs[0].server_name = entry.server_name;
+      if (entry.port) logs[0].port = entry.port;
+    } else {
+      logs.unshift({
+        ...entry,
+        count: 1,
+        timestamp: new Date().toISOString()
+      });
+    }
+
     if (logs.length > 300) logs = logs.slice(0, 300);
     fs.writeFileSync(LOGS_FILE, JSON.stringify(logs, null, 2), 'utf8');
   } catch (err) {
@@ -1186,6 +1209,25 @@ app.delete('/api/admin/banned-ips/:ip', requireAdmin, (req, res) => {
 
 // ---------------------- Audit Logs Management ----------------------
 
+function collapseLogs(rawLogs) {
+  if (!Array.isArray(rawLogs) || rawLogs.length === 0) return [];
+  const collapsed = [];
+  for (const item of rawLogs) {
+    const last = collapsed[collapsed.length - 1];
+    if (last && last.key === item.key && last.ip === item.ip && last.valid === item.valid) {
+      last.count = (last.count || 1) + (item.count || 1);
+      if (new Date(item.timestamp) > new Date(last.timestamp)) {
+        last.timestamp = item.timestamp;
+      }
+      if (item.server_name) last.server_name = item.server_name;
+      if (item.port) last.port = item.port;
+    } else {
+      collapsed.push({ ...item, count: item.count || 1 });
+    }
+  }
+  return collapsed;
+}
+
 // View validation logs
 app.get('/api/admin/logs', requireAdmin, (req, res) => {
   try {
@@ -1193,7 +1235,7 @@ app.get('/api/admin/logs', requireAdmin, (req, res) => {
     if (fs.existsSync(LOGS_FILE)) {
       logs = JSON.parse(fs.readFileSync(LOGS_FILE, 'utf8'));
     }
-    res.json({ logs });
+    res.json({ logs: collapseLogs(logs) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
