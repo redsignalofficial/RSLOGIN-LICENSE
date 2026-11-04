@@ -8,34 +8,31 @@
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script>
     tailwind.config = {
       darkMode: 'class',
       theme: {
         extend: {
           fontFamily: {
-            sans: ['Geist', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-            mono: ['Geist Mono', 'monospace'],
+            sans: ['"Plus Jakarta Sans"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
           },
           colors: {
-            surface: {
-              base: '#000000',
-              card: '#181818',
-              hover: '#1F1F1F',
-              subtle: '#1F1F1F',
-            },
-            border: {
-              subtle: '#272727',
-              strong: '#313131',
-            },
             brand: {
-              DEFAULT: '#E53935',
-              hover: '#D32F2F',
+              DEFAULT: '#FF3355',
+              hover: '#E02447',
+              cyan: '#00F7FF',
+              blue: '#2563EB',
+            },
+            surface: {
+              base: '#070A12',
+              card: '#0F1626',
+              cardHover: '#152037',
+              subtle: '#121A2D',
+              border: '#1E2B45',
+              borderLight: '#2A3C60',
             }
-          },
-          transitionTimingFunction: {
-            spring: 'cubic-bezier(0.22, 1, 0.36, 1)',
           }
         }
       }
@@ -43,496 +40,536 @@
   </script>
   <style>
     body {
-      font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
-      background-color: #000000;
-      color: #FFFFFF;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #070A12;
+      color: #F8FAFC;
       letter-spacing: -0.01em;
     }
     code, .font-mono, #terminal-output, #cmd-input {
-      font-family: 'Geist Mono', monospace;
+      font-family: 'JetBrains Mono', monospace;
       font-variant-numeric: tabular-nums;
     }
-    h1, h2, h3, h4, h5, h6 {
-      text-wrap: balance;
-      letter-spacing: -0.02em;
-    }
-    p, span, td, th {
-      text-wrap: pretty;
-    }
-    .text-gradient {
-      background: linear-gradient(90deg, #FFFFFF 0%, #9B9B9B 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
     .surface-card {
-      background-color: #181818;
-      border: 1px solid #272727;
+      background-color: #0F1626;
+      border: 1px solid #1E2B45;
+    }
+    .surface-card-hover:hover {
+      background-color: #141E34;
+      border-color: #2A3C60;
     }
     .surface-subtle {
-      background-color: #1F1F1F;
-      border: 1px solid #272727;
+      background-color: #121A2D;
+      border: 1px solid #1E2B45;
     }
-    button, a {
-      transition: all 250ms cubic-bezier(0.22, 1, 0.36, 1);
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #070A12; }
+    ::-webkit-scrollbar-thumb { background: #1E2B45; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #2A3C60; }
+    .scrollbar-none::-webkit-scrollbar { display: none; }
+    .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* Transitions */
+    button, a, input, select, textarea {
+      transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
     }
     button:active {
       transform: scale(0.98);
     }
-    /* Terminal custom scrollbar */
-    #terminal-output::-webkit-scrollbar { width: 5px; }
-    #terminal-output::-webkit-scrollbar-track { background: #000000; }
-    #terminal-output::-webkit-scrollbar-thumb { background: #272727; border-radius: 4px; }
-    #terminal-output::-webkit-scrollbar-thumb:hover { background: #313131; }
   </style>
 </head>
-<body class="bg-black text-white min-h-screen flex flex-col selection:bg-brand selection:text-white">
+<body class="bg-[#070A12] text-slate-100 min-h-screen flex flex-col selection:bg-brand selection:text-white">
 
   <!-- Toast Notification -->
-  <div id="toast" class="fixed top-5 right-5 z-50 transform transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] translate-y-[-150%] opacity-0 pointer-events-none flex items-center gap-3 px-4 py-3 rounded-xl surface-card shadow-2xl">
+  <div id="toast" class="fixed top-5 right-5 z-50 transform transition-all duration-300 ease-out translate-y-[-150%] opacity-0 pointer-events-none flex items-center gap-3 px-4 py-3 rounded-xl surface-card shadow-2xl border border-surface-border">
     <i id="toast-icon" class="ph-bold ph-check-circle text-emerald-400 text-lg"></i>
-    <span id="toast-msg" class="text-sm font-medium text-zinc-200">Notification</span>
+    <span id="toast-msg" class="text-sm font-medium text-slate-200">Notification</span>
   </div>
 
-  <!-- LOGIN SCREEN -->
+  <!-- ==================== LOGIN VIEW ==================== -->
   <div id="login-view" class="flex-1 flex items-center justify-center p-4">
-    <div class="w-full max-w-md surface-card rounded-2xl p-8 shadow-2xl relative">
-      
-      <div class="flex items-center gap-3 mb-6">
-        <div class="w-11 h-11 rounded-xl bg-brand flex items-center justify-center text-white shadow-md shadow-brand/20">
+    <div class="w-full max-w-md surface-card rounded-2xl p-8 shadow-2xl relative border border-surface-border">
+      <!-- Glow ambient -->
+      <div class="absolute -top-16 -left-16 w-32 h-32 bg-brand/20 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -bottom-16 -right-16 w-32 h-32 bg-brand-cyan/20 rounded-full blur-3xl pointer-events-none"></div>
+
+      <div class="flex items-center gap-3.5 mb-6">
+        <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-brand to-rose-600 flex items-center justify-center text-white shadow-lg shadow-brand/25">
           <i class="ph-bold ph-shield-check text-2xl"></i>
         </div>
         <div>
-          <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-            <span>RSLogin</span>
-            <span class="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-[#1F1F1F] text-zinc-400 border border-[#272727]">Admin</span>
-          </h1>
-          <p class="text-xs text-zinc-400">License Verification Control Center</p>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-extrabold tracking-tight text-white">RSLogin</h1>
+            <span class="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-brand/10 text-brand font-bold border border-brand/30">Control Center</span>
+          </div>
+          <p class="text-xs text-slate-400">License Verification & Node Manager</p>
         </div>
       </div>
 
       <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4">
         <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">Admin Secret Password</label>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Master Admin Password</label>
           <div class="relative">
             <input id="admin-pass" type="password" required placeholder="Enter ADMIN_SECRET password..."
-              class="w-full bg-[#1F1F1F] border border-[#272727] rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand font-mono transition-all duration-200">
-            <button type="button" onclick="togglePasswordVisibility('admin-pass')" class="absolute right-3.5 top-3.5 text-zinc-500 hover:text-zinc-300">
+              class="w-full bg-surface-subtle border border-surface-border rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan font-mono transition-all">
+            <button type="button" onclick="togglePasswordVisibility('admin-pass')" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1">
               <i id="admin-pass-icon" class="ph ph-eye text-lg"></i>
             </button>
           </div>
         </div>
 
-        <p id="login-error" class="text-xs text-red-400 hidden"></p>
+        <div id="login-error" class="hidden text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3 font-medium"></div>
 
-        <button type="submit" id="login-btn"
-          class="w-full bg-brand hover:bg-brand-hover text-white font-semibold py-3 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
-          <span>Authenticate</span>
+        <button id="login-btn" type="submit"
+          class="w-full bg-gradient-to-r from-brand to-rose-600 hover:from-brand-hover hover:to-rose-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-brand/20 flex items-center justify-center gap-2 text-sm transition-all">
+          <span>Authenticate Session</span>
           <i class="ph-bold ph-arrow-right text-xs"></i>
         </button>
       </form>
 
-      <div class="mt-6 pt-6 border-t border-[#272727] flex items-center justify-between text-xs text-zinc-500">
-        <span>RED SIGNAL &bull; RSLogin</span>
-        <span class="inline-flex items-center gap-1.5 text-emerald-400 font-mono">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Service Online
-        </span>
+      <div class="mt-6 pt-5 border-t border-surface-border flex items-center justify-between text-[11px] text-slate-500 font-mono">
+        <span>RSLogin Universal Core</span>
+        <span class="text-brand-cyan">v1.4.3</span>
       </div>
     </div>
   </div>
 
-  <!-- DASHBOARD SCREEN -->
-  <div id="dashboard-view" class="hidden flex-1 flex flex-col">
-    <!-- Floating Navbar -->
-    <header class="sticky top-0 z-40 px-4 pt-3 pb-1">
-      <div class="max-w-7xl mx-auto px-4 h-14 rounded-2xl surface-card flex items-center justify-between shadow-xl backdrop-blur-md bg-[#181818]/95">
-        <div class="flex items-center gap-3">
-          <div class="w-8 h-8 rounded-lg bg-brand flex items-center justify-center text-white shadow-sm">
-            <i class="ph-bold ph-shield-check text-lg"></i>
-          </div>
-          <div class="hidden sm:block">
-            <div class="text-sm font-bold text-white tracking-tight flex items-center gap-2">
-              <span class="text-gradient">RSLogin</span>
-              <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#1F1F1F] text-zinc-400 border border-[#272727]">v1.4.0</span>
+  <!-- ==================== DASHBOARD VIEW ==================== -->
+  <div id="dashboard-view" class="hidden flex-1 flex flex-col min-h-screen">
+
+    <!-- Top Header & Navigation Bar -->
+    <header class="sticky top-0 z-40 bg-[#070A12]/95 backdrop-blur-md border-b border-surface-border">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16 gap-4">
+          
+          <!-- Brand Logo -->
+          <div class="flex items-center gap-3 shrink-0">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand to-rose-600 flex items-center justify-center text-white shadow-md shadow-brand/25">
+              <i class="ph-bold ph-shield-check text-xl"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="font-extrabold text-base tracking-tight text-white">RSLogin</span>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-brand-cyan/10 text-brand-cyan border border-brand-cyan/30 font-bold hidden sm:inline">CENTER</span>
+              </div>
+              <p class="text-[11px] text-slate-400 font-medium hidden sm:block">License & Node Manager</p>
             </div>
           </div>
-        </div>
 
-        <!-- Navigation Tabs -->
-        <nav class="flex items-center gap-1 bg-[#1F1F1F] p-1 rounded-xl border border-[#272727] overflow-x-auto max-w-[calc(100vw-170px)] md:max-w-none scrollbar-none whitespace-nowrap">
-          <button onclick="switchTab('overview')" id="nav-overview" class="tab-btn shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[#272727] transition-all flex items-center gap-1.5">
-            <i class="ph-bold ph-chart-pie text-zinc-400"></i> Overview
-          </button>
-          <button onclick="switchTab('licenses')" id="nav-licenses" class="tab-btn shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-1.5">
-            <i class="ph-bold ph-key"></i> Licenses
-          </button>
-          <button onclick="switchTab('servers')" id="nav-servers" class="tab-btn shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-1.5">
-            <i class="ph-bold ph-server"></i> Servers
-          </button>
-          <button onclick="switchTab('console')" id="nav-console" class="tab-btn shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-1.5 relative">
-            <i class="ph-bold ph-terminal text-emerald-400"></i> Console
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-          </button>
-          <button onclick="switchTab('banned')" id="nav-banned" class="tab-btn shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-1.5">
-            <i class="ph-bold ph-prohibit text-red-400"></i> Banned IPs
-          </button>
-          <button onclick="switchTab('logs')" id="nav-logs" class="tab-btn shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-1.5">
-            <i class="ph-bold ph-clipboard-text"></i> Audit Logs
-          </button>
-        </nav>
+          <!-- Segmented Tab Navigation -->
+          <nav class="flex items-center gap-1 overflow-x-auto scrollbar-none py-1 bg-surface-subtle/80 p-1 rounded-xl border border-surface-border">
+            <button onclick="switchTab('overview')" id="nav-overview" class="tab-btn shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-surface-border transition-all flex items-center gap-1.5">
+              <i class="ph-bold ph-chart-pie-slice text-brand-cyan"></i> <span>Overview</span>
+            </button>
+            <button onclick="switchTab('licenses')" id="nav-licenses" class="tab-btn shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition-all flex items-center gap-1.5">
+              <i class="ph-bold ph-key text-blue-400"></i> <span>Licenses</span>
+            </button>
+            <button onclick="switchTab('servers')" id="nav-servers" class="tab-btn shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition-all flex items-center gap-1.5">
+              <i class="ph-bold ph-server text-purple-400"></i> <span>Servers</span>
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            </button>
+            <button onclick="switchTab('console')" id="nav-console" class="tab-btn shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition-all flex items-center gap-1.5">
+              <i class="ph-bold ph-terminal text-emerald-400"></i> <span>Console</span>
+            </button>
+            <button onclick="switchTab('banned')" id="nav-banned" class="tab-btn shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition-all flex items-center gap-1.5">
+              <i class="ph-bold ph-prohibit text-rose-400"></i> <span>Banned IPs</span>
+            </button>
+            <button onclick="switchTab('logs')" id="nav-logs" class="tab-btn shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition-all flex items-center gap-1.5">
+              <i class="ph-bold ph-clipboard-text text-amber-400"></i> <span>Audit Logs</span>
+            </button>
+          </nav>
 
-        <div class="flex items-center gap-2">
-          <button onclick="refreshData()" title="Refresh Data" class="p-2 text-zinc-400 hover:text-white hover:bg-[#1F1F1F] rounded-lg transition-all border border-[#272727]">
-            <i id="refresh-icon" class="ph-bold ph-arrows-clockwise text-base"></i>
-          </button>
-          <button onclick="handleLogout()" class="px-3 py-1.5 text-xs font-semibold text-zinc-300 hover:text-white bg-[#1F1F1F] hover:bg-[#272727] rounded-lg border border-[#272727] transition-all flex items-center gap-1.5">
-            <i class="ph-bold ph-sign-out text-red-400"></i> Logout
-          </button>
+          <!-- Right Action Controls -->
+          <div class="flex items-center gap-2 shrink-0">
+            <button onclick="refreshData()" title="Refresh Dashboard" class="p-2 text-slate-400 hover:text-white hover:bg-surface-subtle rounded-xl transition-all border border-surface-border">
+              <i id="refresh-icon" class="ph-bold ph-arrows-clockwise text-base"></i>
+            </button>
+            <button onclick="handleLogout()" class="px-3 py-1.5 text-xs font-bold text-slate-300 hover:text-white bg-surface-subtle hover:bg-rose-500/10 hover:border-rose-500/40 rounded-xl border border-surface-border transition-all flex items-center gap-1.5">
+              <i class="ph-bold ph-sign-out text-rose-400"></i> <span class="hidden md:inline">Logout</span>
+            </button>
+          </div>
+
         </div>
       </div>
     </header>
 
-    <!-- Main Content Area -->
+    <!-- Main Content Container -->
     <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
 
-      <!-- TAB 1: OVERVIEW -->
+      <!-- ==================== TAB 1: OVERVIEW ==================== -->
       <section id="tab-overview" class="space-y-6">
-        <!-- Stats Cards -->
+        
+        <!-- Welcome Hero Banner -->
+        <div class="surface-card rounded-2xl p-6 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-surface-border shadow-xl">
+          <div class="absolute -top-12 -right-12 w-48 h-48 bg-brand-cyan/10 rounded-full blur-3xl pointer-events-none"></div>
+          <div class="relative space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-mono font-bold">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> SYSTEM OPERATIONAL
+              </span>
+              <span class="text-xs font-mono text-slate-500">API v1.4.3</span>
+            </div>
+            <h2 class="text-lg sm:text-xl font-extrabold text-white tracking-tight">RSLogin Protection &amp; Node Center</h2>
+            <p class="text-xs text-slate-400 max-w-xl">
+              Live license validation hub, Minecraft server node telemetry, and real-time security management.
+            </p>
+          </div>
+          <div class="relative flex items-center gap-2.5 shrink-0">
+            <button onclick="switchTab('console')" class="bg-surface-subtle hover:bg-surface-border text-emerald-400 border border-emerald-500/30 font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all flex items-center gap-1.5">
+              <i class="ph-bold ph-terminal text-sm"></i> <span>Live Terminal</span>
+            </button>
+            <button onclick="openCreateModal()" class="bg-gradient-to-r from-brand to-rose-600 hover:from-brand-hover hover:to-rose-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-brand/20 transition-all flex items-center gap-1.5">
+              <i class="ph-bold ph-plus text-sm"></i> <span>Generate License</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 4 Metric Cards -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div class="surface-card rounded-2xl p-5 shadow-lg">
+          <!-- Total Licenses -->
+          <div class="surface-card rounded-2xl p-5 border border-surface-border shadow-lg relative overflow-hidden">
             <div class="flex items-center justify-between mb-3">
-              <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Total Licenses</span>
-              <div class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center border border-blue-500/20">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Keys</span>
+              <div class="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center border border-blue-500/20">
                 <i class="ph-bold ph-key text-base"></i>
               </div>
             </div>
-            <div id="stat-total" class="text-3xl font-bold font-mono text-white tracking-tight">0</div>
-            <div class="text-xs text-zinc-500 mt-1">Configured keys in database</div>
+            <div id="stat-total" class="text-3xl font-extrabold font-mono text-white tracking-tight">0</div>
+            <div class="text-xs text-slate-500 mt-1 flex items-center gap-1">
+              <span>Configured licenses</span>
+            </div>
           </div>
 
-          <div class="surface-card rounded-2xl p-5 shadow-lg">
+          <!-- Active Licenses -->
+          <div class="surface-card rounded-2xl p-5 border border-surface-border shadow-lg relative overflow-hidden">
             <div class="flex items-center justify-between mb-3">
-              <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Active Licenses</span>
-              <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Active Keys</span>
+              <div class="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20">
                 <i class="ph-bold ph-check-circle text-base"></i>
               </div>
             </div>
-            <div id="stat-active" class="text-3xl font-bold font-mono text-emerald-400 tracking-tight">0</div>
-            <div class="text-xs text-zinc-500 mt-1">Authorized for server boot</div>
+            <div id="stat-active" class="text-3xl font-extrabold font-mono text-emerald-400 tracking-tight">0</div>
+            <div class="text-xs text-slate-500 mt-1 flex items-center gap-1">
+              <span>Authorized for boot</span>
+            </div>
           </div>
 
-          <div onclick="switchTab('servers')" class="surface-card rounded-2xl p-5 shadow-lg cursor-pointer hover:border-purple-500/40 transition-all group">
+          <!-- Connected Servers -->
+          <div onclick="switchTab('servers')" class="surface-card surface-card-hover rounded-2xl p-5 border border-surface-border shadow-lg cursor-pointer transition-all group">
             <div class="flex items-center justify-between mb-3">
-              <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400 group-hover:text-purple-300 transition-colors">Connected Servers</span>
-              <div class="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center border border-purple-500/20">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-400 group-hover:text-purple-300 transition-colors">Connected Servers</span>
+              <div class="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center border border-purple-500/20">
                 <i class="ph-bold ph-server text-base"></i>
               </div>
             </div>
-            <div id="stat-servers" class="text-3xl font-bold font-mono text-purple-400 tracking-tight">0</div>
-            <div class="text-xs text-zinc-500 mt-1 flex items-center gap-1">
+            <div id="stat-servers" class="text-3xl font-extrabold font-mono text-purple-400 tracking-tight">0</div>
+            <div class="text-xs text-slate-500 mt-1 flex items-center gap-1">
               <span>View server nodes</span>
-              <i class="ph-bold ph-arrow-right text-[10px] text-purple-400"></i>
+              <i class="ph-bold ph-arrow-right text-[10px] text-purple-400 group-hover:translate-x-0.5 transition-transform"></i>
             </div>
           </div>
 
-          <div class="surface-card rounded-2xl p-5 shadow-lg">
+          <!-- Banned IPs -->
+          <div onclick="switchTab('banned')" class="surface-card surface-card-hover rounded-2xl p-5 border border-surface-border shadow-lg cursor-pointer transition-all group">
             <div class="flex items-center justify-between mb-3">
-              <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Banned IPs</span>
-              <div class="w-8 h-8 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center border border-red-500/20">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-400 group-hover:text-rose-300 transition-colors">Banned IPs</span>
+              <div class="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center border border-rose-500/20">
                 <i class="ph-bold ph-prohibit text-base"></i>
               </div>
             </div>
-            <div id="stat-banned" class="text-3xl font-bold font-mono text-red-400 tracking-tight">0</div>
-            <div class="text-xs text-zinc-500 mt-1">Blocked from connecting</div>
-          </div>
-        </div>
-
-        <!-- Quick Actions Banner -->
-        <div class="surface-card rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div class="space-y-1">
-            <h2 class="text-base font-bold text-white flex items-center gap-2">
-              <i class="ph-bold ph-shield-check text-brand"></i> RSLogin Protection Center
-            </h2>
-            <p class="text-xs text-zinc-400 max-w-xl">
-              Real-time validation API with integrated live terminal console, IP blacklisting, and per-key server node tracking.
-            </p>
-          </div>
-          <div class="flex items-center gap-2">
-            <button onclick="switchTab('console')" class="shrink-0 bg-[#1F1F1F] hover:bg-[#272727] text-emerald-400 border border-emerald-500/20 font-semibold text-xs px-3.5 py-2.5 rounded-xl transition-all flex items-center gap-1.5">
-              <i class="ph-bold ph-terminal text-sm"></i> Live Console
-            </button>
-            <button onclick="openCreateModal()" class="shrink-0 bg-brand hover:bg-brand-hover text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-1.5">
-              <i class="ph-bold ph-plus text-sm"></i> Generate License
-            </button>
-          </div>
-        </div>
-
-        <!-- Active Minecraft Server Nodes on Overview -->
-        <div class="surface-card rounded-2xl overflow-hidden shadow-xl">
-          <div class="px-6 py-4 border-b border-[#272727] flex items-center justify-between">
-            <div>
-              <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                <i class="ph-bold ph-server text-purple-400 text-base"></i> Active Minecraft Server Nodes
-              </h3>
-              <p class="text-xs text-zinc-400">Live servers currently running RSLogin, displaying online status, players, and core version.</p>
+            <div id="stat-banned" class="text-3xl font-extrabold font-mono text-rose-400 tracking-tight">0</div>
+            <div class="text-xs text-slate-500 mt-1 flex items-center gap-1">
+              <span>Blocked addresses</span>
+              <i class="ph-bold ph-arrow-right text-[10px] text-rose-400 group-hover:translate-x-0.5 transition-transform"></i>
             </div>
-            <button onclick="switchTab('servers')" class="text-xs text-brand hover:text-red-400 font-semibold flex items-center gap-1">
-              <span>Full Servers View</span> <i class="ph-bold ph-arrow-right text-xs"></i>
-            </button>
-          </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs">
-              <thead class="bg-[#1F1F1F]/60 text-zinc-400 uppercase tracking-wider font-semibold border-b border-[#272727]">
-                <tr>
-                  <th class="px-6 py-3.5">Status</th>
-                  <th class="px-6 py-3.5">Server / MOTD</th>
-                  <th class="px-6 py-3.5">Players</th>
-                  <th class="px-6 py-3.5">Platform & Version</th>
-                  <th class="px-6 py-3.5">Address</th>
-                  <th class="px-6 py-3.5">License Key & Owner</th>
-                  <th class="px-6 py-3.5">Last Seen</th>
-                </tr>
-              </thead>
-              <tbody id="overview-servers-table-body" class="divide-y divide-[#272727]/60 text-zinc-300">
-                <tr><td colspan="7" class="px-6 py-8 text-center text-zinc-500">No servers running currently.</td></tr>
-              </tbody>
-            </table>
           </div>
         </div>
 
-        <!-- Recent Validations Table -->
-        <div class="surface-card rounded-2xl overflow-hidden shadow-xl">
-          <div class="px-6 py-4 border-b border-[#272727] flex items-center justify-between">
-            <h3 class="text-sm font-bold text-white flex items-center gap-2">
-              <i class="ph-bold ph-clock-counter-clockwise text-zinc-400 text-base"></i> Latest Server Requests
-            </h3>
-            <button onclick="switchTab('logs')" class="text-xs text-brand hover:text-red-400 font-semibold flex items-center gap-1">
-              <span>View All Logs</span> <i class="ph-bold ph-arrow-right text-xs"></i>
+        <!-- Two Column Main Dashboard Area -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+          <!-- Left Column (7 cols): Connected Servers Section -->
+          <div class="lg:col-span-7 space-y-4">
+            <div class="surface-card rounded-2xl overflow-hidden border border-surface-border shadow-xl">
+              <div class="px-5 py-4 border-b border-surface-border flex items-center justify-between bg-surface-subtle/50">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center border border-purple-500/20">
+                    <i class="ph-bold ph-server text-sm"></i>
+                  </div>
+                  <div>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">Connected Minecraft Servers</h3>
+                    <p class="text-[11px] text-slate-400">Active server clusters running RSLogin</p>
+                  </div>
+                </div>
+                <button onclick="switchTab('servers')" class="text-xs text-brand-cyan hover:underline font-semibold flex items-center gap-1">
+                  <span>View All</span> <i class="ph-bold ph-arrow-right text-[10px]"></i>
+                </button>
+              </div>
+
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                  <thead class="bg-surface-subtle text-slate-400 uppercase tracking-wider font-bold border-b border-surface-border">
+                    <tr>
+                      <th class="px-5 py-3">Status</th>
+                      <th class="px-5 py-3">Server / MOTD</th>
+                      <th class="px-5 py-3">Players</th>
+                      <th class="px-5 py-3">Address</th>
+                      <th class="px-5 py-3 text-right">Heartbeat</th>
+                    </tr>
+                  </thead>
+                  <tbody id="overview-servers-table-body" class="divide-y divide-surface-border text-slate-300">
+                    <tr><td colspan="5" class="px-5 py-8 text-center text-slate-500">No servers running currently. Launch your Minecraft server with RSLogin to see it appear live.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column (5 cols): Real-Time Validation Activity -->
+          <div class="lg:col-span-5 space-y-4">
+            <div class="surface-card rounded-2xl overflow-hidden border border-surface-border shadow-xl">
+              <div class="px-5 py-4 border-b border-surface-border flex items-center justify-between bg-surface-subtle/50">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-7 h-7 rounded-lg bg-brand-cyan/10 text-brand-cyan flex items-center justify-center border border-brand-cyan/20">
+                    <i class="ph-bold ph-shield-check text-sm"></i>
+                  </div>
+                  <div>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">Latest Validations</h3>
+                    <p class="text-[11px] text-slate-400">Incoming license requests</p>
+                  </div>
+                </div>
+                <button onclick="switchTab('logs')" class="text-xs text-brand hover:underline font-semibold flex items-center gap-1">
+                  <span>All Logs</span> <i class="ph-bold ph-arrow-right text-[10px]"></i>
+                </button>
+              </div>
+
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                  <thead class="bg-surface-subtle text-slate-400 uppercase tracking-wider font-bold border-b border-surface-border">
+                    <tr>
+                      <th class="px-4 py-3">Time</th>
+                      <th class="px-4 py-3">Key / IP</th>
+                      <th class="px-4 py-3">Status</th>
+                      <th class="px-4 py-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="recent-logs-table" class="divide-y divide-surface-border text-slate-300">
+                    <tr><td colspan="4" class="px-4 py-8 text-center text-slate-500">No requests recorded yet.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- ==================== TAB 2: LICENSES ==================== -->
+      <section id="tab-licenses" class="hidden space-y-5">
+        
+        <!-- Action Header Bar -->
+        <div class="surface-card rounded-2xl p-5 border border-surface-border shadow-xl flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+          <div class="flex-1 max-w-md relative">
+            <i class="ph-bold ph-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+            <input id="license-search" type="text" oninput="filterLicenses()" placeholder="Search key, owner name, status..."
+              class="w-full bg-surface-subtle border border-surface-border rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-cyan">
+          </div>
+
+          <div class="flex items-center gap-2.5">
+            <button onclick="openCreateModal()" class="bg-gradient-to-r from-brand to-rose-600 hover:from-brand-hover hover:to-rose-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-brand/20 transition-all flex items-center gap-1.5">
+              <i class="ph-bold ph-plus text-sm"></i> <span>Create New Key</span>
             </button>
           </div>
+        </div>
+
+        <!-- License Table -->
+        <div class="surface-card rounded-2xl overflow-hidden border border-surface-border shadow-xl">
           <div class="overflow-x-auto">
             <table class="w-full text-left text-xs">
-              <thead class="bg-[#1F1F1F]/60 text-zinc-400 uppercase tracking-wider font-semibold border-b border-[#272727]">
+              <thead class="bg-surface-subtle text-slate-400 uppercase tracking-wider font-bold border-b border-surface-border">
                 <tr>
-                  <th class="px-6 py-3.5">Time</th>
-                  <th class="px-6 py-3.5">License Key</th>
-                  <th class="px-6 py-3.5">Server IP</th>
-                  <th class="px-6 py-3.5">Platform</th>
-                  <th class="px-6 py-3.5">Outcome</th>
-                  <th class="px-6 py-3.5 text-right">Quick Action</th>
+                  <th class="px-6 py-4">License Key</th>
+                  <th class="px-6 py-4">Owner</th>
+                  <th class="px-6 py-4">Tier</th>
+                  <th class="px-6 py-4">Connected Nodes</th>
+                  <th class="px-6 py-4">IP Lock</th>
+                  <th class="px-6 py-4">Status</th>
+                  <th class="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody id="recent-logs-table" class="divide-y divide-[#272727]/60 text-zinc-300">
-                <tr><td colspan="6" class="px-6 py-6 text-center text-zinc-500">Loading recent logs...</td></tr>
+              <tbody id="licenses-table-body" class="divide-y divide-surface-border text-slate-300">
+                <tr><td colspan="7" class="px-6 py-8 text-center text-slate-500">Loading licenses...</td></tr>
               </tbody>
             </table>
           </div>
         </div>
       </section>
 
-      <!-- TAB 2: LICENSES -->
-      <section id="tab-licenses" class="hidden space-y-4">
-        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <div class="relative flex-1 max-w-md">
-            <i class="ph ph-magnifying-glass absolute left-3.5 top-3 text-zinc-500 text-sm"></i>
-            <input id="license-search" oninput="filterLicenses()" type="text" placeholder="Search by key, owner, or status..."
-              class="w-full bg-[#181818] border border-[#272727] rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-brand font-mono transition-colors">
-          </div>
-          <button onclick="openCreateModal()" class="bg-brand hover:bg-brand-hover text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5">
-            <i class="ph-bold ph-plus text-sm"></i> Create New Key
-          </button>
-        </div>
-
-        <div class="surface-card rounded-2xl overflow-hidden shadow-xl">
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs">
-              <thead class="bg-[#1F1F1F]/60 text-zinc-400 uppercase tracking-wider font-semibold border-b border-[#272727]">
-                <tr>
-                  <th class="px-6 py-3.5">License Key</th>
-                  <th class="px-6 py-3.5">Owner</th>
-                  <th class="px-6 py-3.5">Tier</th>
-                  <th class="px-6 py-3.5">Servers Connected</th>
-                  <th class="px-6 py-3.5">IP Lock</th>
-                  <th class="px-6 py-3.5">Status</th>
-                  <th class="px-6 py-3.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody id="licenses-table-body" class="divide-y divide-[#272727]/60 text-zinc-300">
-                <tr><td colspan="7" class="px-6 py-8 text-center text-zinc-500">Loading licenses...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <!-- TAB 3: CONNECTED SERVERS -->
-      <section id="tab-servers" class="hidden space-y-4">
-        <div class="surface-card rounded-2xl p-6 shadow-xl">
-          <div class="flex items-center justify-between mb-4">
+      <!-- ==================== TAB 3: CONNECTED SERVERS ==================== -->
+      <section id="tab-servers" class="hidden space-y-5">
+        <div class="surface-card rounded-2xl p-6 border border-surface-border shadow-xl">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 pb-4 border-b border-surface-border">
             <div>
-              <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <h2 class="text-base font-extrabold text-white flex items-center gap-2">
                 <i class="ph-bold ph-server text-purple-400 text-lg"></i> Connected Minecraft Server Nodes
               </h2>
-              <p class="text-xs text-zinc-400">Active server instances heartbeat-checking with your license server. You can disconnect or ban them directly.</p>
+              <p class="text-xs text-slate-400">Live servers running RSLogin, displaying online status, players, and core version.</p>
             </div>
-            <button onclick="refreshData()" class="text-xs text-zinc-400 hover:text-white px-3 py-1.5 rounded-lg border border-[#272727] bg-[#1F1F1F] flex items-center gap-1.5">
-              <i class="ph-bold ph-arrows-clockwise text-xs"></i> Refresh
+            <button onclick="refreshData()" class="text-xs text-slate-300 hover:text-white px-3 py-1.5 rounded-xl border border-surface-border bg-surface-subtle flex items-center gap-1.5 shrink-0">
+              <i class="ph-bold ph-arrows-clockwise text-xs"></i> <span>Refresh Nodes</span>
             </button>
           </div>
 
           <div class="overflow-x-auto">
             <table class="w-full text-left text-xs">
-              <thead class="bg-[#1F1F1F]/60 text-zinc-400 uppercase tracking-wider font-semibold border-b border-[#272727]">
+              <thead class="bg-surface-subtle text-slate-400 uppercase tracking-wider font-bold border-b border-surface-border">
                 <tr>
-                  <th class="px-6 py-3.5">Status</th>
-                  <th class="px-6 py-3.5">Server / MOTD</th>
-                  <th class="px-6 py-3.5">Players</th>
-                  <th class="px-6 py-3.5">Platform & Version</th>
-                  <th class="px-6 py-3.5">Address / Port</th>
-                  <th class="px-6 py-3.5">License & Owner</th>
-                  <th class="px-6 py-3.5">Last Heartbeat</th>
-                  <th class="px-6 py-3.5 text-right">Actions</th>
+                  <th class="px-6 py-4">Status</th>
+                  <th class="px-6 py-4">Server / MOTD</th>
+                  <th class="px-6 py-4">Players</th>
+                  <th class="px-6 py-4">Platform & Version</th>
+                  <th class="px-6 py-4">Address / Port</th>
+                  <th class="px-6 py-4">License Key & Owner</th>
+                  <th class="px-6 py-4">Heartbeat</th>
+                  <th class="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody id="all-servers-table-body" class="divide-y divide-[#272727]/60 text-zinc-300">
-                <tr><td colspan="8" class="px-6 py-8 text-center text-zinc-500">No servers connected yet.</td></tr>
+              <tbody id="all-servers-table-body" class="divide-y divide-surface-border text-slate-300">
+                <tr><td colspan="8" class="px-6 py-8 text-center text-slate-500">No servers connected yet.</td></tr>
               </tbody>
             </table>
           </div>
         </div>
       </section>
 
-      <!-- TAB 4: INTERACTIVE LIVE CONSOLE -->
+      <!-- ==================== TAB 4: INTERACTIVE LIVE CONSOLE ==================== -->
       <section id="tab-console" class="hidden space-y-4">
-        <div class="surface-card rounded-2xl overflow-hidden shadow-2xl flex flex-col h-[75vh]">
+        <div class="surface-card rounded-2xl overflow-hidden border border-surface-border shadow-2xl flex flex-col h-[75vh]">
           
           <!-- Terminal Titlebar -->
-          <div class="bg-[#1F1F1F]/90 border-b border-[#272727] px-4 py-3 flex items-center justify-between">
+          <div class="bg-surface-subtle border-b border-surface-border px-4 py-3 flex items-center justify-between">
             <div class="flex items-center gap-3">
               <div class="flex items-center gap-1.5">
-                <span class="w-2.5 h-2.5 rounded-full bg-red-500/80 inline-block"></span>
-                <span class="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block"></span>
-                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block"></span>
+                <span class="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span>
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span>
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
               </div>
-              <span class="text-xs font-mono text-zinc-300 font-semibold flex items-center gap-2">
+              <span class="text-xs font-mono text-slate-300 font-semibold flex items-center gap-2">
                 <i class="ph-bold ph-terminal text-emerald-400"></i> admin@rslogin-core:~$ (Interactive CLI)
               </span>
             </div>
 
             <!-- Telemetry & Stream Status -->
             <div class="flex items-center gap-3 text-xs font-mono">
-              <span id="console-stream-status" class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px]">
+              <span id="console-stream-status" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> STREAM LIVE
               </span>
-              <span id="telemetry-mem" class="text-zinc-400 hidden sm:inline">RAM: 0 MB</span>
-              <span id="telemetry-uptime" class="text-zinc-400 hidden sm:inline">UPTIME: 0s</span>
+              <span id="telemetry-mem" class="text-slate-400 hidden sm:inline">RAM: 0 MB</span>
+              <span id="telemetry-uptime" class="text-slate-400 hidden sm:inline">UPTIME: 0s</span>
             </div>
           </div>
 
-          <!-- Quick Action Buttons Bar -->
-          <div class="bg-[#181818] border-b border-[#272727] px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-            <div class="flex items-center gap-1.5 flex-wrap">
-              <span class="text-zinc-500 text-[11px] font-mono mr-1">Quick Run:</span>
-              <button onclick="runConsoleCommand('help')" class="px-2 py-0.5 rounded-md bg-[#272727] hover:bg-[#313131] text-zinc-300 text-[11px] font-mono">help</button>
-              <button onclick="runConsoleCommand('status')" class="px-2 py-0.5 rounded-md bg-[#272727] hover:bg-[#313131] text-zinc-300 text-[11px] font-mono">status</button>
-              <button onclick="runConsoleCommand('keys')" class="px-2 py-0.5 rounded-md bg-[#272727] hover:bg-[#313131] text-zinc-300 text-[11px] font-mono">keys</button>
-              <button onclick="runConsoleCommand('servers')" class="px-2 py-0.5 rounded-md bg-[#272727] hover:bg-[#313131] text-zinc-300 text-[11px] font-mono">servers</button>
-              <button onclick="runConsoleCommand('banned')" class="px-2 py-0.5 rounded-md bg-[#272727] hover:bg-[#313131] text-zinc-300 text-[11px] font-mono">banned</button>
-            </div>
-
-            <div class="flex items-center gap-3 text-xs">
-              <label class="flex items-center gap-1.5 text-zinc-400 cursor-pointer text-[11px]">
-                <input id="auto-scroll-toggle" type="checkbox" checked class="rounded bg-[#1F1F1F] border-[#272727] text-brand focus:ring-0">
-                <span>Auto-Scroll</span>
-              </label>
-              <button onclick="clearConsoleView()" class="text-zinc-400 hover:text-white text-[11px] flex items-center gap-1">
-                <i class="ph-bold ph-broom"></i> Clear
-              </button>
-            </div>
+          <!-- Terminal Output Log Buffer -->
+          <div id="terminal-output" class="flex-1 p-4 bg-[#05070E] font-mono text-xs text-slate-200 overflow-y-auto space-y-1 select-text">
+            <div class="text-slate-500">// RSLogin Protection Center Interactive CLI v1.4.3</div>
+            <div class="text-slate-500">// Type 'help' for available commands or 'clear' to purge buffer.</div>
           </div>
 
-          <!-- Terminal Output Screen -->
-          <div id="terminal-output" class="flex-1 p-4 overflow-y-auto space-y-1 bg-black text-[12px] font-mono leading-relaxed select-text">
-            <div class="text-zinc-500">Connecting to server console stream...</div>
-          </div>
+          <!-- Bottom Command Input & Quick Actions -->
+          <div class="bg-surface-subtle border-t border-surface-border p-3 space-y-2">
+            
+            <!-- Quick Command Helper Chips -->
+            <div class="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1">
+              <span class="text-[10px] font-mono text-slate-500 uppercase tracking-wider mr-1">Quick:</span>
+              <button onclick="insertCommand('help')" class="px-2 py-0.5 rounded bg-surface-card hover:bg-surface-cardHover border border-surface-border text-slate-300 font-mono text-[11px]">help</button>
+              <button onclick="insertCommand('licenses')" class="px-2 py-0.5 rounded bg-surface-card hover:bg-surface-cardHover border border-surface-border text-blue-400 font-mono text-[11px]">licenses</button>
+              <button onclick="insertCommand('stats')" class="px-2 py-0.5 rounded bg-surface-card hover:bg-surface-cardHover border border-surface-border text-emerald-400 font-mono text-[11px]">stats</button>
+              <button onclick="insertCommand('servers')" class="px-2 py-0.5 rounded bg-surface-card hover:bg-surface-cardHover border border-surface-border text-purple-400 font-mono text-[11px]">servers</button>
+              <button onclick="insertCommand('banned')" class="px-2 py-0.5 rounded bg-surface-card hover:bg-surface-cardHover border border-surface-border text-rose-400 font-mono text-[11px]">banned</button>
+              <button onclick="clearConsole()" class="px-2 py-0.5 rounded bg-surface-card hover:bg-surface-cardHover border border-surface-border text-amber-400 font-mono text-[11px]">clear</button>
+            </div>
 
-          <!-- Interactive Command Prompt Input -->
-          <form onsubmit="handleCommandSubmit(event)" class="bg-[#181818] border-t border-[#272727] px-4 py-3 flex items-center gap-2">
-            <span class="text-emerald-400 font-mono text-xs font-semibold select-none flex items-center gap-1">
-              <span>admin@redsignal</span><span class="text-zinc-500">:</span><span class="text-blue-400">~</span><span class="text-zinc-400">$</span>
-            </span>
-            <input id="cmd-input" type="text" autocomplete="off" spellcheck="false" placeholder="Type a command (e.g. help, status, keys, gen <name>, ban <ip>)..."
-              class="flex-1 bg-transparent border-0 text-xs text-white placeholder-zinc-600 focus:outline-none focus:ring-0 font-mono">
-            <button type="submit" class="px-3 py-1 rounded-lg bg-brand hover:bg-brand-hover text-white text-xs font-semibold shadow-sm flex items-center gap-1">
-              <span>Run</span> <i class="ph-bold ph-arrow-right text-[10px]"></i>
-            </button>
-          </form>
+            <!-- Command Form -->
+            <form onsubmit="handleCommandSubmit(event)" class="flex items-center gap-2">
+              <span class="text-emerald-400 font-mono font-bold text-sm pl-1">&gt;</span>
+              <input id="cmd-input" type="text" autocomplete="off" placeholder="Enter CLI command (e.g. help, licenses, ban 1.2.3.4)..."
+                class="flex-1 bg-transparent border-0 text-white font-mono text-xs focus:outline-none focus:ring-0 placeholder-slate-600">
+              <div class="flex items-center gap-2 shrink-0">
+                <label class="flex items-center gap-1 text-[11px] font-mono text-slate-400 cursor-pointer select-none">
+                  <input id="auto-scroll-toggle" type="checkbox" checked class="rounded bg-surface-card border-surface-border text-brand focus:ring-0">
+                  <span>Auto-scroll</span>
+                </label>
+                <button type="submit" class="px-3 py-1 bg-brand hover:bg-brand-hover text-white rounded-lg text-xs font-bold transition-all">Send</button>
+              </div>
+            </form>
+          </div>
 
         </div>
       </section>
 
-      <!-- TAB 5: BANNED IPS -->
+      <!-- ==================== TAB 5: BANNED IPS ==================== -->
       <section id="tab-banned" class="hidden space-y-4">
-        <div class="surface-card rounded-2xl p-6 shadow-xl">
-          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
+        <div class="surface-card rounded-2xl p-6 border border-surface-border shadow-xl">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 pb-4 border-b border-surface-border">
             <div>
-              <h2 class="text-base font-bold text-white flex items-center gap-2">
-                <i class="ph-bold ph-prohibit text-red-400 text-lg"></i> Blacklisted IP Addresses
+              <h2 class="text-base font-extrabold text-white flex items-center gap-2">
+                <i class="ph-bold ph-prohibit text-rose-400 text-lg"></i> Blacklisted IP Addresses
               </h2>
-              <p class="text-xs text-zinc-400">Any server IP listed here will be blocked from validating licenses or registering server nodes.</p>
+              <p class="text-xs text-slate-400">IP addresses blocked from verifying licenses or querying this server.</p>
             </div>
-            <button onclick="openBanModal()" class="bg-red-600 hover:bg-red-500 text-white font-semibold text-xs px-3.5 py-2 rounded-xl shadow-md transition-all flex items-center gap-1.5">
-              <i class="ph-bold ph-plus text-sm"></i> Blacklist New IP
+            <button onclick="openBanModal()" class="text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 px-3.5 py-2 rounded-xl flex items-center gap-1.5 shrink-0 shadow-md">
+              <i class="ph-bold ph-plus text-xs"></i> <span>Blacklist New IP</span>
             </button>
           </div>
 
           <div class="overflow-x-auto">
             <table class="w-full text-left text-xs">
-              <thead class="bg-[#1F1F1F]/60 text-zinc-400 uppercase tracking-wider font-semibold border-b border-[#272727]">
+              <thead class="bg-surface-subtle text-slate-400 uppercase tracking-wider font-bold border-b border-surface-border">
                 <tr>
-                  <th class="px-6 py-3.5">Banned IP</th>
-                  <th class="px-6 py-3.5">Reason</th>
-                  <th class="px-6 py-3.5">Banned Date</th>
-                  <th class="px-6 py-3.5 text-right">Actions</th>
+                  <th class="px-6 py-4">IP Address</th>
+                  <th class="px-6 py-4">Reason / Note</th>
+                  <th class="px-6 py-4">Banned At</th>
+                  <th class="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody id="banned-ips-table-body" class="divide-y divide-[#272727]/60 text-zinc-300">
-                <tr><td colspan="4" class="px-6 py-8 text-center text-zinc-500">No IP addresses are currently blacklisted.</td></tr>
+              <tbody id="banned-ips-table-body" class="divide-y divide-surface-border text-slate-300">
+                <tr><td colspan="4" class="px-6 py-8 text-center text-slate-500">No banned IPs found.</td></tr>
               </tbody>
             </table>
           </div>
         </div>
       </section>
 
-      <!-- TAB 6: AUDIT LOGS -->
+      <!-- ==================== TAB 6: AUDIT LOGS ==================== -->
       <section id="tab-logs" class="hidden space-y-4">
-        <div class="surface-card rounded-2xl p-6 shadow-xl">
-          <div class="flex items-center justify-between mb-4">
+        <div class="surface-card rounded-2xl p-6 border border-surface-border shadow-xl">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 pb-4 border-b border-surface-border">
             <div>
-              <h2 class="text-base font-bold text-white flex items-center gap-2">
-                <i class="ph-bold ph-clipboard-text text-zinc-400 text-lg"></i> Validation Audit Trail
+              <h2 class="text-base font-extrabold text-white flex items-center gap-2">
+                <i class="ph-bold ph-clipboard-text text-amber-400 text-lg"></i> Validation Audit Logs
               </h2>
-              <p class="text-xs text-zinc-400">Complete historical record of incoming plugin license validation requests.</p>
+              <p class="text-xs text-slate-400">Complete historical record of incoming server license validation requests.</p>
             </div>
-            <button onclick="clearLogs()" class="text-xs text-red-400 hover:text-red-300 font-semibold px-3 py-1.5 rounded-lg border border-red-500/20 bg-red-950/20 hover:bg-red-950/40 transition-all flex items-center gap-1.5">
-              <i class="ph-bold ph-trash text-xs"></i> Clear Audit Trail
+            <button onclick="clearLogs()" class="text-xs font-bold text-slate-300 hover:text-white px-3 py-1.5 rounded-xl border border-surface-border bg-surface-subtle hover:bg-rose-500/10 hover:border-rose-500/30 flex items-center gap-1.5 shrink-0">
+              <i class="ph-bold ph-trash text-rose-400"></i> <span>Purge Logs</span>
             </button>
           </div>
 
           <div class="overflow-x-auto">
             <table class="w-full text-left text-xs">
-              <thead class="bg-[#1F1F1F]/60 text-zinc-400 uppercase tracking-wider font-semibold border-b border-[#272727]">
+              <thead class="bg-surface-subtle text-slate-400 uppercase tracking-wider font-bold border-b border-surface-border">
                 <tr>
-                  <th class="px-6 py-3.5">Timestamp</th>
-                  <th class="px-6 py-3.5">License Key</th>
-                  <th class="px-6 py-3.5">Server IP</th>
-                  <th class="px-6 py-3.5">Product</th>
-                  <th class="px-6 py-3.5">Status</th>
-                  <th class="px-6 py-3.5">Reason / Message</th>
-                  <th class="px-6 py-3.5 text-right">Action</th>
+                  <th class="px-6 py-4">Time</th>
+                  <th class="px-6 py-4">License Key</th>
+                  <th class="px-6 py-4">Server IP</th>
+                  <th class="px-6 py-4">Platform</th>
+                  <th class="px-6 py-4">Status / Reason</th>
+                  <th class="px-6 py-4 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody id="full-logs-table-body" class="divide-y divide-[#272727]/60 text-zinc-300">
-                <tr><td colspan="7" class="px-6 py-8 text-center text-zinc-500">No validation requests logged yet.</td></tr>
+              <tbody id="full-logs-table-body" class="divide-y divide-surface-border text-slate-300">
+                <tr><td colspan="6" class="px-6 py-8 text-center text-slate-500">No logs recorded yet.</td></tr>
               </tbody>
             </table>
           </div>
@@ -542,223 +579,218 @@
     </main>
   </div>
 
-  <!-- MODAL: CREATE LICENSE -->
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- Modal 1: Create License -->
   <div id="modal-create" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden">
-    <div class="w-full max-w-lg surface-card rounded-2xl p-6 shadow-2xl space-y-5">
-      <div class="flex items-center justify-between border-b border-[#272727] pb-4">
-        <h3 class="text-sm font-bold text-white flex items-center gap-2">
-          <i class="ph-bold ph-plus-circle text-brand text-lg"></i> Create New License Key
+    <div class="w-full max-w-lg surface-card rounded-2xl p-6 shadow-2xl border border-surface-border relative">
+      <div class="flex items-center justify-between pb-4 border-b border-surface-border mb-4">
+        <h3 class="text-sm font-extrabold text-white flex items-center gap-2">
+          <i class="ph-bold ph-key text-brand text-base"></i> Generate New License Key
         </h3>
-        <button onclick="closeCreateModal()" class="text-zinc-500 hover:text-white">
-          <i class="ph-bold ph-x text-lg"></i>
-        </button>
+        <button onclick="closeCreateModal()" class="text-slate-400 hover:text-white"><i class="ph-bold ph-x text-lg"></i></button>
       </div>
 
       <form onsubmit="handleCreateLicense(event)" class="space-y-4">
         <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Customer / Owner Name</label>
-          <input id="create-owner" type="text" required placeholder="e.g. Steve Server Host"
-            class="w-full bg-[#1F1F1F] border border-[#272727] rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-brand">
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">License Key String</label>
+          <div class="flex gap-2">
+            <input id="create-key" type="text" required placeholder="e.g. RS-XXXX-XXXX-XXXX"
+              class="flex-1 bg-surface-subtle border border-surface-border rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:outline-none focus:border-brand-cyan">
+            <button type="button" onclick="generateRandomKey()" class="px-3 py-2 rounded-xl bg-surface-subtle hover:bg-surface-border text-slate-300 text-xs font-bold border border-surface-border">
+              Generate
+            </button>
+          </div>
         </div>
 
         <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Custom License Key (Leave empty to auto-generate)</label>
-          <input id="create-key" type="text" placeholder="e.g. RS-XXXX-XXXX-XXXX-XXXX"
-            class="w-full bg-[#1F1F1F] border border-[#272727] rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-brand font-mono">
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Customer / Owner</label>
+          <input id="create-owner" type="text" required placeholder="e.g. ServerNetworkMC"
+            class="w-full bg-surface-subtle border border-surface-border rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand-cyan">
         </div>
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Tier</label>
-            <select id="create-tier" class="w-full bg-[#1F1F1F] border border-[#272727] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">License Tier</label>
+            <select id="create-tier" class="w-full bg-surface-subtle border border-surface-border rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand-cyan">
               <option value="PREMIUM">PREMIUM</option>
               <option value="ENTERPRISE">ENTERPRISE</option>
               <option value="STANDARD">STANDARD</option>
-              <option value="TRIAL">TRIAL</option>
             </select>
           </div>
           <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Max Servers (0 = Unlimited)</label>
-            <input id="create-max-servers" type="number" min="0" value="0" placeholder="0 for Unlimited"
-              class="w-full bg-[#1F1F1F] border border-[#272727] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand font-mono">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Max Servers (0 = Unlimited)</label>
+            <input id="create-max-servers" type="number" min="0" value="5"
+              class="w-full bg-surface-subtle border border-surface-border rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:outline-none focus:border-brand-cyan">
           </div>
         </div>
 
         <div class="pt-2">
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input id="create-ip-lock" type="checkbox" checked class="rounded bg-[#1F1F1F] border-[#272727] text-brand focus:ring-0">
-            <span class="text-xs text-zinc-300">Enable IP Lock (Key binds to first connected server IP)</span>
+          <label class="flex items-center gap-2 cursor-pointer select-none">
+            <input id="create-ip-lock" type="checkbox" class="rounded bg-surface-subtle border-surface-border text-brand focus:ring-0">
+            <span class="text-xs text-slate-300 font-semibold">Enable IP Lock (Automatically binds to first server IP)</span>
           </label>
         </div>
 
-        <div class="flex items-center justify-end gap-2 pt-4 border-t border-[#272727]">
-          <button type="button" onclick="closeCreateModal()" class="px-4 py-2 text-xs text-zinc-400 hover:text-white rounded-xl bg-[#1F1F1F] hover:bg-[#272727]">Cancel</button>
-          <button type="submit" class="px-4 py-2 text-xs font-semibold text-white bg-brand hover:bg-brand-hover rounded-xl shadow-sm">Create License</button>
+        <div class="flex items-center justify-end gap-2 pt-4 border-t border-surface-border">
+          <button type="button" onclick="closeCreateModal()" class="px-4 py-2 text-xs text-slate-400 hover:text-white rounded-xl bg-surface-subtle">Cancel</button>
+          <button type="submit" class="px-4 py-2 text-xs font-bold text-white bg-brand hover:bg-brand-hover rounded-xl shadow-md">Create License</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- MODAL: EDIT LICENSE -->
+  <!-- Modal 2: Edit License -->
   <div id="modal-edit" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden">
-    <div class="w-full max-w-lg surface-card rounded-2xl p-6 shadow-2xl space-y-5">
-      <div class="flex items-center justify-between border-b border-[#272727] pb-4">
-        <h3 class="text-sm font-bold text-white flex items-center gap-2">
-          <i class="ph-bold ph-pencil-simple text-purple-400 text-lg"></i> Edit License Information
+    <div class="w-full max-w-lg surface-card rounded-2xl p-6 shadow-2xl border border-surface-border relative">
+      <div class="flex items-center justify-between pb-4 border-b border-surface-border mb-4">
+        <h3 class="text-sm font-extrabold text-white flex items-center gap-2">
+          <i class="ph-bold ph-pencil-simple text-purple-400 text-base"></i> Edit License Information
         </h3>
-        <button onclick="closeEditModal()" class="text-zinc-500 hover:text-white">
-          <i class="ph-bold ph-x text-lg"></i>
-        </button>
+        <button onclick="closeEditModal()" class="text-slate-400 hover:text-white"><i class="ph-bold ph-x text-lg"></i></button>
       </div>
 
       <form onsubmit="handleEditLicense(event)" class="space-y-4">
-        <input type="hidden" id="edit-orig-key">
+        <input id="edit-orig-key" type="hidden">
 
         <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">License Key</label>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">License Key</label>
           <input id="edit-key" type="text" required
-            class="w-full bg-[#1F1F1F] border border-[#272727] rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-brand font-mono font-bold">
-          <p class="text-[10px] text-zinc-500 mt-1">You can rename this license key or keep it as is.</p>
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Customer / Owner Name</label>
-          <input id="edit-owner" type="text" required placeholder="e.g. Steve Server Host"
-            class="w-full bg-[#1F1F1F] border border-[#272727] rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-brand">
+            class="w-full bg-surface-subtle border border-surface-border rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:outline-none focus:border-brand-cyan">
         </div>
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Status</label>
-            <select id="edit-status" class="w-full bg-[#1F1F1F] border border-[#272727] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand font-mono">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Customer / Owner</label>
+            <input id="edit-owner" type="text" required
+              class="w-full bg-surface-subtle border border-surface-border rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand-cyan">
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Status</label>
+            <select id="edit-status" class="w-full bg-surface-subtle border border-surface-border rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand-cyan">
               <option value="ACTIVE">ACTIVE</option>
               <option value="SUSPENDED">SUSPENDED</option>
             </select>
           </div>
-          <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Tier</label>
-            <select id="edit-tier" class="w-full bg-[#1F1F1F] border border-[#272727] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand font-mono">
-              <option value="PREMIUM">PREMIUM</option>
-              <option value="ENTERPRISE">ENTERPRISE</option>
-              <option value="STANDARD">STANDARD</option>
-              <option value="LIFETIME">LIFETIME</option>
-              <option value="TRIAL">TRIAL</option>
-            </select>
-          </div>
         </div>
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Max Servers (0 = Unlimited)</label>
-            <input id="edit-max-servers" type="number" min="0" value="0" placeholder="0 for Unlimited"
-              class="w-full bg-[#1F1F1F] border border-[#272727] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand font-mono">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Tier</label>
+            <select id="edit-tier" class="w-full bg-surface-subtle border border-surface-border rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand-cyan">
+              <option value="PREMIUM">PREMIUM</option>
+              <option value="ENTERPRISE">ENTERPRISE</option>
+              <option value="STANDARD">STANDARD</option>
+            </select>
           </div>
           <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Bound IP (Optional)</label>
-            <input id="edit-bound-ip" type="text" placeholder="e.g. 15.235.232.27 or blank"
-              class="w-full bg-[#1F1F1F] border border-[#272727] rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-brand font-mono">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Max Servers (0 = Unlimited)</label>
+            <input id="edit-max-servers" type="number" min="0"
+              class="w-full bg-surface-subtle border border-surface-border rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:outline-none focus:border-brand-cyan">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 pt-1">
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Bound IP</label>
+            <input id="edit-bound-ip" type="text" placeholder="Not bound yet"
+              class="w-full bg-surface-subtle border border-surface-border rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:outline-none focus:border-brand-cyan">
+          </div>
+          <div class="flex items-center pt-5">
+            <label class="flex items-center gap-2 cursor-pointer select-none">
+              <input id="edit-ip-lock" type="checkbox" class="rounded bg-surface-subtle border-surface-border text-brand focus:ring-0">
+              <span class="text-xs text-slate-300 font-semibold">Enable IP Lock</span>
+            </label>
           </div>
         </div>
 
         <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Administrative Note</label>
-          <input id="edit-note" type="text" placeholder="e.g. Assigned to customer via Discord"
-            class="w-full bg-[#1F1F1F] border border-[#272727] rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-brand">
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Admin Note</label>
+          <input id="edit-note" type="text" placeholder="Internal memo, customer transaction ID, etc."
+            class="w-full bg-surface-subtle border border-surface-border rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand-cyan">
         </div>
 
-        <div class="pt-1">
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input id="edit-ip-lock" type="checkbox" class="rounded bg-[#1F1F1F] border-[#272727] text-brand focus:ring-0">
-            <span class="text-xs text-zinc-300">Enable IP Lock (Restrict to bound IP)</span>
-          </label>
-        </div>
-
-        <div class="flex items-center justify-end gap-2 pt-4 border-t border-[#272727]">
-          <button type="button" onclick="closeEditModal()" class="px-4 py-2 text-xs text-zinc-400 hover:text-white rounded-xl bg-[#1F1F1F] hover:bg-[#272727]">Cancel</button>
-          <button type="submit" id="edit-submit-btn" class="px-4 py-2 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-xl shadow-sm flex items-center gap-1.5">
-            <i class="ph-bold ph-check text-xs"></i> Save Changes
-          </button>
+        <div class="flex items-center justify-end gap-2 pt-4 border-t border-surface-border">
+          <button type="button" onclick="closeEditModal()" class="px-4 py-2 text-xs text-slate-400 hover:text-white rounded-xl bg-surface-subtle">Cancel</button>
+          <button id="edit-submit-btn" type="submit" class="px-4 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 rounded-xl shadow-md">Save Changes</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- MODAL: SERVERS PER KEY -->
+  <!-- Modal 3: Key Servers Modal -->
   <div id="modal-key-servers" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden">
-    <div class="w-full max-w-2xl surface-card rounded-2xl p-6 shadow-2xl space-y-4">
-      <div class="flex items-center justify-between border-b border-[#272727] pb-4">
+    <div class="w-full max-w-4xl surface-card rounded-2xl p-6 shadow-2xl border border-surface-border relative">
+      <div class="flex items-center justify-between pb-4 border-b border-surface-border mb-4">
         <div>
-          <h3 class="text-sm font-bold text-white flex items-center gap-2">
-            <i class="ph-bold ph-server text-purple-400 text-lg"></i> Connected Servers For License
+          <h3 class="text-sm font-extrabold text-white flex items-center gap-2">
+            <i class="ph-bold ph-server text-purple-400 text-base"></i> Connected Servers for License
           </h3>
-          <p id="modal-key-subtitle" class="text-xs text-zinc-400 font-mono mt-0.5"></p>
+          <p id="modal-key-subtitle" class="text-xs text-slate-400 font-mono mt-0.5"></p>
         </div>
-        <button onclick="closeServersModal()" class="text-zinc-500 hover:text-white">
-          <i class="ph-bold ph-x text-lg"></i>
-        </button>
+        <button onclick="closeServersModal()" class="text-slate-400 hover:text-white"><i class="ph-bold ph-x text-lg"></i></button>
       </div>
 
-      <div class="overflow-x-auto max-h-[50vh]">
+      <div class="overflow-x-auto max-h-[60vh]">
         <table class="w-full text-left text-xs">
-          <thead class="bg-[#1F1F1F] text-zinc-400 uppercase tracking-wider font-semibold border-b border-[#272727]">
+          <thead class="bg-surface-subtle text-slate-400 uppercase tracking-wider font-bold border-b border-surface-border sticky top-0">
             <tr>
-              <th class="px-4 py-2.5">Status</th>
-              <th class="px-4 py-2.5">Server / MOTD</th>
-              <th class="px-4 py-2.5">Players</th>
-              <th class="px-4 py-2.5">Address</th>
-              <th class="px-4 py-2.5">Platform</th>
-              <th class="px-4 py-2.5">Last Seen</th>
-              <th class="px-4 py-2.5 text-right">Actions</th>
+              <th class="px-4 py-3">Status</th>
+              <th class="px-4 py-3">Server / MOTD</th>
+              <th class="px-4 py-3">Players</th>
+              <th class="px-4 py-3">Address</th>
+              <th class="px-4 py-3">Platform</th>
+              <th class="px-4 py-3">Last Seen</th>
+              <th class="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody id="modal-servers-table-body" class="divide-y divide-[#272727] text-zinc-300">
-            <tr><td colspan="5" class="px-4 py-6 text-center text-zinc-500">Loading servers...</td></tr>
+          <tbody id="modal-servers-table-body" class="divide-y divide-surface-border text-slate-300">
+            <tr><td colspan="7" class="px-4 py-6 text-center text-slate-500">Loading servers...</td></tr>
           </tbody>
         </table>
       </div>
 
-      <div class="flex items-center justify-end pt-3 border-t border-[#272727]">
-        <button onclick="closeServersModal()" class="px-4 py-1.5 text-xs text-zinc-300 hover:text-white rounded-xl bg-[#1F1F1F] hover:bg-[#272727]">Close</button>
+      <div class="flex justify-end pt-4 border-t border-surface-border mt-4">
+        <button onclick="closeServersModal()" class="px-4 py-2 text-xs font-bold text-slate-300 hover:text-white rounded-xl bg-surface-subtle border border-surface-border">Close</button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL: BAN IP -->
+  <!-- Modal 4: Ban IP Modal -->
   <div id="modal-ban" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden">
-    <div class="w-full max-w-md surface-card rounded-2xl p-6 shadow-2xl space-y-4">
-      <div class="flex items-center justify-between border-b border-[#272727] pb-3">
-        <h3 class="text-sm font-bold text-white flex items-center gap-2">
-          <i class="ph-bold ph-prohibit text-red-500 text-lg"></i> Blacklist IP Address
+    <div class="w-full max-w-md surface-card rounded-2xl p-6 shadow-2xl border border-surface-border relative">
+      <div class="flex items-center justify-between pb-4 border-b border-surface-border mb-4">
+        <h3 class="text-sm font-extrabold text-white flex items-center gap-2">
+          <i class="ph-bold ph-prohibit text-rose-500 text-base"></i> Blacklist IP Address
         </h3>
-        <button onclick="closeBanModal()" class="text-zinc-500 hover:text-white">
-          <i class="ph-bold ph-x text-lg"></i>
-        </button>
+        <button onclick="closeBanModal()" class="text-slate-400 hover:text-white"><i class="ph-bold ph-x text-lg"></i></button>
       </div>
 
-      <form onsubmit="handleBanIp(event)" class="space-y-4">
+      <form onsubmit="handleBanSubmit(event)" class="space-y-4">
         <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">IP Address to Block</label>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">IP Address to Block</label>
           <input id="ban-ip-input" type="text" required placeholder="e.g. 192.168.1.100"
-            class="w-full bg-[#1F1F1F] border border-[#272727] rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-red-500 font-mono">
+            class="w-full bg-surface-subtle border border-surface-border rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 font-mono">
         </div>
 
         <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Reason / Note</label>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Reason / Note</label>
           <input id="ban-reason-input" type="text" placeholder="e.g. Unauthorized server or key leaking"
-            class="w-full bg-[#1F1F1F] border border-[#272727] rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-red-500">
+            class="w-full bg-surface-subtle border border-surface-border rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500">
         </div>
 
-        <div class="flex items-center justify-end gap-2 pt-3 border-t border-[#272727]">
-          <button type="button" onclick="closeBanModal()" class="px-4 py-2 text-xs text-zinc-400 hover:text-white rounded-xl bg-[#1F1F1F]">Cancel</button>
-          <button type="submit" class="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-500 rounded-xl shadow-sm">Blacklist IP</button>
+        <div class="flex items-center justify-end gap-2 pt-4 border-t border-surface-border">
+          <button type="button" onclick="closeBanModal()" class="px-4 py-2 text-xs text-slate-400 hover:text-white rounded-xl bg-surface-subtle">Cancel</button>
+          <button type="submit" class="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 rounded-xl shadow-md">Blacklist IP</button>
         </div>
       </form>
     </div>
   </div>
 
+
+  <!-- ==================== JAVASCRIPT APPLICATION CORE ==================== -->
   <script>
-    // ---------------------- Application State & Security ----------------------
-    // Use sessionStorage so the admin session token is never permanently stored on disk
+    // Application State & Security
     let token = sessionStorage.getItem('rslogin_admin_token') || localStorage.getItem('rslogin_admin_token') || '';
     let globalLicenses = [];
     let globalLogs = [];
@@ -789,22 +821,19 @@
             headers: { 'Authorization': `Bearer ${token}` }
           });
           if (res.ok) {
-            // Migrate token to sessionStorage and cleanse localStorage
             sessionStorage.setItem('rslogin_admin_token', token);
             localStorage.removeItem('rslogin_admin_token');
             showDashboard();
             return;
           }
-        } catch (e) {
-          // Fall through to showLogin if verify fails
-        }
+        } catch (e) {}
         handleLogout(false);
       } else {
         showLogin();
       }
     });
 
-    // ---------------------- Toast System ----------------------
+    // Toast Notification System
     let toastTimeout;
     function showToast(message, isError = false) {
       const toast = document.getElementById('toast');
@@ -813,7 +842,7 @@
 
       msg.innerText = message;
       if (isError) {
-        icon.className = 'ph-bold ph-x-circle text-red-400 text-lg';
+        icon.className = 'ph-bold ph-x-circle text-rose-400 text-lg';
       } else {
         icon.className = 'ph-bold ph-check-circle text-emerald-400 text-lg';
       }
@@ -828,7 +857,7 @@
       }, 3000);
     }
 
-    // ---------------------- Authentication & Brute Force Defense ----------------------
+    // Authentication Handlers
     function togglePasswordVisibility(id) {
       const input = document.getElementById(id);
       const icon = document.getElementById('admin-pass-icon');
@@ -862,7 +891,7 @@
         if (res.ok && data.token) {
           token = data.token;
           sessionStorage.setItem('rslogin_admin_token', token);
-          localStorage.removeItem('rslogin_admin_token'); // Purge legacy plaintext password
+          localStorage.removeItem('rslogin_admin_token');
           document.getElementById('admin-pass').value = '';
           lastActivityTime = Date.now();
           showDashboard();
@@ -880,7 +909,7 @@
         errEl.classList.remove('hidden');
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '<span>Authenticate</span> <i class="ph-bold ph-arrow-right text-xs"></i>';
+        btn.innerHTML = '<span>Authenticate Session</span> <i class="ph-bold ph-arrow-right text-xs"></i>';
       }
     }
 
@@ -933,7 +962,7 @@
         if (el) el.classList.add('hidden');
         const btn = document.getElementById(`nav-${t}`);
         if (btn) {
-          btn.className = 'tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition-all flex items-center gap-1.5';
+          btn.className = 'tab-btn shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition-all flex items-center gap-1.5';
         }
       });
 
@@ -941,56 +970,43 @@
       if (activeEl) activeEl.classList.remove('hidden');
       const activeBtn = document.getElementById(`nav-${tab}`);
       if (activeBtn) {
-        activeBtn.className = 'tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[#272727] transition-all flex items-center gap-1.5';
+        activeBtn.className = 'tab-btn shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-surface-border transition-all flex items-center gap-1.5 shadow-sm';
       }
 
       if (tab === 'console') {
         scrollConsoleToBottom();
-        document.getElementById('cmd-input').focus();
+        const input = document.getElementById('cmd-input');
+        if (input) input.focus();
       }
     }
 
     async function refreshData() {
+      if (!token) return;
       const icon = document.getElementById('refresh-icon');
       if (icon) icon.classList.add('animate-spin');
 
       try {
-        const [licRes, logRes, banRes, conRes] = await Promise.all([
+        const [licRes, logRes, banRes] = await Promise.all([
           fetch('/api/admin/licenses', { headers: { 'Authorization': `Bearer ${token}` } }),
           fetch('/api/admin/logs', { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch('/api/admin/banned-ips', { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch('/api/admin/console/logs', { headers: { 'Authorization': `Bearer ${token}` } })
+          fetch('/api/admin/banned-ips', { headers: { 'Authorization': `Bearer ${token}` } })
         ]);
 
-        if (licRes.status === 401 || licRes.status === 403) {
-          handleLogout();
+        if (licRes.status === 401 || logRes.status === 401) {
+          handleLogout(true, 'Session expired. Please log in again.');
           return;
         }
 
-        const licData = await licRes.json();
-        const logData = await logRes.json();
-        const banData = await banRes.json();
-        const conData = await conRes.json();
-
-        globalLicenses = licData.licenses || [];
-        globalLogs = logData.logs || [];
-        globalBannedIps = banData.banned_ips || [];
+        if (licRes.ok) globalLicenses = await licRes.json();
+        if (logRes.ok) globalLogs = await logRes.json();
+        if (banRes.ok) globalBannedIps = await banRes.json();
 
         renderStats();
         renderLicensesTable(globalLicenses);
         renderRecentLogs();
         renderAllServers();
-        renderBannedIpsTable();
+        renderBannedIps();
         renderFullLogs();
-
-        // Render console initial buffer if needed
-        if (conData && conData.logs && document.getElementById('terminal-output').children.length <= 1) {
-          renderConsoleInitial(conData.logs);
-        }
-        if (conData && conData.telemetry) {
-          updateConsoleTelemetry(conData.telemetry);
-        }
-
       } catch (err) {
         showToast('Error syncing data: ' + err.message, true);
       } finally {
@@ -998,7 +1014,7 @@
       }
     }
 
-    // ---------------------- Overview Tab ----------------------
+    // Overview Stats
     function renderStats() {
       const total = globalLicenses.length;
       const active = globalLicenses.filter(l => l.status === 'ACTIVE').length;
@@ -1016,11 +1032,11 @@
       document.getElementById('stat-banned').innerText = globalBannedIps.length;
     }
 
-    // ---------------------- Licenses Table ----------------------
+    // Licenses Table
     function renderLicensesTable(licenses) {
       const tbody = document.getElementById('licenses-table-body');
       if (!licenses || licenses.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-zinc-500">No licenses found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-slate-500">No licenses found.</td></tr>';
         return;
       }
 
@@ -1028,47 +1044,47 @@
         const serverCount = lic.servers ? Object.keys(lic.servers).length : 0;
         const maxServers = (lic.max_servers && lic.max_servers > 0) ? lic.max_servers : '∞';
         const statusBadge = lic.status === 'ACTIVE'
-          ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">ACTIVE</span>'
-          : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono">SUSPENDED</span>';
+          ? '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-mono"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> ACTIVE</span>'
+          : '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 font-mono">SUSPENDED</span>';
 
-        const tierBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-[#272727] text-zinc-300 border border-[#313131] font-mono">${lic.tier || 'STANDARD'}</span>`;
+        const tierBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-surface-subtle text-slate-300 border border-surface-border font-mono">${lic.tier || 'STANDARD'}</span>`;
 
         return `
-          <tr class="hover:bg-[#1F1F1F]/60 transition-colors">
+          <tr class="hover:bg-surface-subtle/50 transition-colors">
             <td class="px-6 py-4 font-mono font-medium text-white flex items-center gap-2">
-              <span>${lic.key}</span>
-              <button onclick="copyToClipboard('${lic.key}')" title="Copy Key" class="text-zinc-500 hover:text-white">
+              <span class="text-xs">${lic.key}</span>
+              <button onclick="copyToClipboard('${lic.key}')" title="Copy Key" class="text-slate-500 hover:text-white p-1">
                 <i class="ph ph-copy text-sm"></i>
               </button>
             </td>
-            <td class="px-6 py-4 font-medium text-zinc-200">${escapeHtml(lic.owner || '—')}</td>
+            <td class="px-6 py-4 font-semibold text-slate-200">${escapeHtml(lic.owner || '—')}</td>
             <td class="px-6 py-4">${tierBadge}</td>
             <td class="px-6 py-4">
-              <button onclick="openServersModal('${lic.key}')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#1F1F1F] hover:bg-[#272727] text-purple-300 font-medium transition-all font-mono border border-[#272727]">
+              <button onclick="openServersModal('${lic.key}')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-subtle hover:bg-surface-border text-purple-300 font-mono text-xs font-semibold border border-surface-border">
                 <i class="ph-bold ph-server text-xs"></i>
                 <span>${serverCount} / ${maxServers}</span>
               </button>
             </td>
-            <td class="px-6 py-4 text-zinc-400 font-mono">
+            <td class="px-6 py-4 text-slate-400 font-mono text-xs">
               ${lic.ip_lock ? `
                 <div class="flex items-center gap-1.5">
                   <span class="text-amber-400 font-mono text-[11px]">${lic.bound_ip ? lic.bound_ip : 'Pending bind'}</span>
-                  ${lic.bound_ip ? `<button onclick="resetIpLock('${lic.key}')" title="Reset IP lock" class="text-zinc-500 hover:text-amber-400"><i class="ph-bold ph-arrows-counter-clockwise text-xs"></i></button>` : ''}
+                  ${lic.bound_ip ? `<button onclick="resetIpLock('${lic.key}')" title="Reset IP lock" class="text-slate-500 hover:text-amber-400"><i class="ph-bold ph-arrows-counter-clockwise text-xs"></i></button>` : ''}
                 </div>
-              ` : '<span class="text-zinc-500">Unlocked</span>'}
+              ` : '<span class="text-slate-500">Unlocked</span>'}
             </td>
             <td class="px-6 py-4">${statusBadge}</td>
             <td class="px-6 py-4 text-right space-x-1.5">
               <button onclick="openEditModal('${escapeAttr(lic.key)}')" title="Edit License Info"
-                class="p-1.5 rounded-lg text-zinc-400 hover:text-purple-400 hover:bg-[#1F1F1F] transition-colors">
+                class="p-1.5 rounded-lg text-slate-400 hover:text-purple-400 hover:bg-surface-subtle transition-colors">
                 <i class="ph-bold ph-pencil-simple text-base"></i>
               </button>
               <button onclick="toggleLicenseStatus('${escapeAttr(lic.key)}', '${lic.status}')" title="${lic.status === 'ACTIVE' ? 'Suspend' : 'Activate'}"
-                class="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-[#1F1F1F] transition-colors">
+                class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-surface-subtle transition-colors">
                 <i class="ph-bold ${lic.status === 'ACTIVE' ? 'ph-pause text-amber-400' : 'ph-play text-emerald-400'} text-base"></i>
               </button>
               <button onclick="deleteLicense('${escapeAttr(lic.key)}')" title="Remove License Key"
-                class="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-[#1F1F1F] transition-colors">
+                class="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-surface-subtle transition-colors">
                 <i class="ph-bold ph-trash text-base"></i>
               </button>
             </td>
@@ -1096,27 +1112,28 @@
       const recent = globalLogs.slice(0, 6);
 
       if (recent.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-6 text-center text-zinc-500">No requests recorded yet.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-8 text-center text-slate-500">No requests recorded yet.</td></tr>';
         return;
       }
 
       tbody.innerHTML = recent.map(log => {
         const statusBadge = log.valid
-          ? '<span class="text-emerald-400 font-semibold flex items-center gap-1 font-mono"><i class="ph-bold ph-check text-xs"></i> ALLOWED</span>'
-          : `<span class="text-red-400 font-semibold flex items-center gap-1 font-mono"><i class="ph-bold ph-x text-xs"></i> ${escapeHtml(log.reason || 'DENIED')}</span>`;
+          ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 font-mono">ALLOWED</span>'
+          : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 font-mono" title="${escapeHtml(log.reason || '')}">DENIED</span>`;
 
         const timeStr = log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : '—';
 
         return `
-          <tr class="hover:bg-[#1F1F1F]/60">
-            <td class="px-6 py-3.5 text-zinc-400 font-mono">${timeStr}</td>
-            <td class="px-6 py-3.5 font-mono text-zinc-300">${log.key || '—'}</td>
-            <td class="px-6 py-3.5 font-mono text-zinc-400">${log.ip || '—'}</td>
-            <td class="px-6 py-3.5 text-zinc-400 font-mono">${log.product || 'plugin'}</td>
-            <td class="px-6 py-3.5">${statusBadge}</td>
-            <td class="px-6 py-3.5 text-right">
+          <tr class="hover:bg-surface-subtle/50 transition-colors">
+            <td class="px-4 py-3 text-slate-400 font-mono text-[11px]">${timeStr}</td>
+            <td class="px-4 py-3">
+              <div class="font-mono text-xs text-white truncate max-w-[140px]" title="${log.key || ''}">${log.key || '—'}</div>
+              <div class="font-mono text-[10px] text-slate-500">${log.ip || '—'}</div>
+            </td>
+            <td class="px-4 py-3">${statusBadge}</td>
+            <td class="px-4 py-3 text-right">
               ${log.ip && log.ip !== '127.0.0.1' ? `
-                <button onclick="promptBanIp('${log.ip}')" class="text-xs text-red-400 hover:text-red-300 font-semibold">Ban IP</button>
+                <button onclick="promptBanIp('${log.ip}')" class="text-[11px] text-rose-400 hover:text-rose-300 font-bold hover:underline">Ban</button>
               ` : '—'}
             </td>
           </tr>
@@ -1139,12 +1156,12 @@
     function getServerStatusBadge(srv) {
       const status = srv.status || 'ONLINE';
       if (status === 'ONLINE') {
-        return `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> ONLINE</span>`;
+        return `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-mono"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> ONLINE</span>`;
       }
       if (status === 'AWAY') {
-        return `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono"><span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> AWAY</span>`;
+        return `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 font-mono"><span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> AWAY</span>`;
       }
-      return `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-800 text-zinc-500 border border-zinc-700 font-mono">OFFLINE</span>`;
+      return `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-500 border border-slate-700 font-mono">OFFLINE</span>`;
     }
 
     function renderAllServers() {
@@ -1174,39 +1191,31 @@
       // Render Overview Tab Servers
       if (overviewTbody) {
         if (serverList.length === 0) {
-          overviewTbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-zinc-500">No servers running currently. Launch your Minecraft server with RSLogin to see it appear live.</td></tr>';
+          overviewTbody.innerHTML = '<tr><td colspan="5" class="px-5 py-8 text-center text-slate-500">No servers running currently. Launch your Minecraft server with RSLogin to see it appear live.</td></tr>';
         } else {
-          overviewTbody.innerHTML = serverList.slice(0, 10).map(srv => {
+          overviewTbody.innerHTML = serverList.slice(0, 8).map(srv => {
             const relTime = formatRelativeTime(srv.last_seen);
             const statusBadge = getServerStatusBadge(srv);
             const serverTitle = renderMinecraftMotd(srv.server_name || 'Minecraft Server');
             const motdText = (srv.motd && srv.motd !== srv.server_name)
-              ? `<div class="mt-1 px-2.5 py-1 rounded bg-[#0D0D0D] border border-[#242424] text-[11px] font-mono leading-relaxed inline-block max-w-md text-zinc-300 shadow-sm">${renderMinecraftMotd(srv.motd)}</div>`
+              ? `<div class="mt-1 px-2 py-0.5 rounded bg-[#05070E] border border-surface-border text-[10px] font-mono leading-relaxed inline-block max-w-xs text-slate-300 shadow-sm">${renderMinecraftMotd(srv.motd)}</div>`
               : '';
 
             return `
-              <tr class="hover:bg-[#1F1F1F]/60 transition-colors">
-                <td class="px-6 py-3.5">${statusBadge}</td>
-                <td class="px-6 py-3.5">
+              <tr class="hover:bg-surface-subtle/50 transition-colors">
+                <td class="px-5 py-3">${statusBadge}</td>
+                <td class="px-5 py-3">
                   <div class="font-bold text-white text-xs">${serverTitle}</div>
                   ${motdText}
                 </td>
-                <td class="px-6 py-3.5">
+                <td class="px-5 py-3">
                   <span class="inline-flex items-center gap-1 font-mono text-xs text-purple-300">
                     <i class="ph-bold ph-users text-xs text-purple-400"></i>
                     ${srv.online_players || 0} / ${srv.max_players || 0}
                   </span>
                 </td>
-                <td class="px-6 py-3.5">
-                  <div class="text-xs text-zinc-200 font-medium">${escapeHtml(srv.product || 'plugin')}</div>
-                  <div class="text-[10px] text-zinc-500 font-mono">${escapeHtml(srv.server_version || 'Unknown')}</div>
-                </td>
-                <td class="px-6 py-3.5 font-mono text-zinc-300 text-xs">${srv.ip}:${srv.port || 25565}</td>
-                <td class="px-6 py-3.5">
-                  <div class="font-mono text-xs text-white">${srv.license_key}</div>
-                  <div class="text-[11px] text-zinc-400">${escapeHtml(srv.owner || '—')}</div>
-                </td>
-                <td class="px-6 py-3.5 text-zinc-300 font-mono text-xs" title="${srv.last_seen || ''}">${relTime}</td>
+                <td class="px-5 py-3 font-mono text-slate-300 text-xs">${srv.ip}:${srv.port || 25565}</td>
+                <td class="px-5 py-3 text-slate-400 font-mono text-xs text-right" title="${srv.last_seen || ''}">${relTime}</td>
               </tr>
             `;
           }).join('');
@@ -1216,7 +1225,7 @@
       // Render Servers Tab Servers
       if (tbody) {
         if (serverList.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-8 text-center text-zinc-500">No servers connected yet.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-8 text-center text-slate-500">No servers connected yet.</td></tr>';
           return;
         }
 
@@ -1225,40 +1234,40 @@
           const statusBadge = getServerStatusBadge(srv);
           const serverTitle = renderMinecraftMotd(srv.server_name || 'Minecraft Server');
           const motdText = (srv.motd && srv.motd !== srv.server_name)
-            ? `<div class="mt-1 px-2.5 py-1 rounded bg-[#0D0D0D] border border-[#242424] text-[11px] font-mono leading-relaxed inline-block max-w-md text-zinc-300 shadow-sm">${renderMinecraftMotd(srv.motd)}</div>`
+            ? `<div class="mt-1 px-2.5 py-1 rounded bg-[#05070E] border border-surface-border text-[11px] font-mono leading-relaxed inline-block max-w-md text-slate-300 shadow-sm">${renderMinecraftMotd(srv.motd)}</div>`
             : '';
 
           return `
-            <tr class="hover:bg-[#1F1F1F]/60 transition-colors">
+            <tr class="hover:bg-surface-subtle/50 transition-colors">
               <td class="px-6 py-3.5">${statusBadge}</td>
               <td class="px-6 py-3.5">
                 <div class="font-bold text-white text-xs">${serverTitle}</div>
                 ${motdText}
               </td>
               <td class="px-6 py-3.5">
-                <span class="inline-flex items-center gap-1 font-mono text-xs text-purple-300">
+                <span class="inline-flex items-center gap-1 font-mono text-xs text-purple-300 font-bold">
                   <i class="ph-bold ph-users text-xs text-purple-400"></i>
                   ${srv.online_players || 0} / ${srv.max_players || 0}
                 </span>
               </td>
               <td class="px-6 py-3.5">
-                <div class="text-xs text-zinc-200 font-medium">${escapeHtml(srv.product || 'plugin')}</div>
-                <div class="text-[10px] text-zinc-500 font-mono">${escapeHtml(srv.server_version || 'Unknown')}</div>
+                <div class="text-xs text-slate-200 font-medium">${escapeHtml(srv.product || 'plugin')}</div>
+                <div class="text-[10px] text-slate-500 font-mono">${escapeHtml(srv.server_version || 'Unknown')}</div>
               </td>
-              <td class="px-6 py-3.5 font-mono text-zinc-300 text-xs">${srv.ip}:${srv.port || 25565}</td>
+              <td class="px-6 py-3.5 font-mono text-slate-300 text-xs">${srv.ip}:${srv.port || 25565}</td>
               <td class="px-6 py-3.5">
                 <div class="font-mono text-xs text-white">${srv.license_key}</div>
-                <div class="text-[11px] text-zinc-400">${escapeHtml(srv.owner || '—')}</div>
+                <div class="text-[11px] text-slate-400">${escapeHtml(srv.owner || '—')}</div>
               </td>
-              <td class="px-6 py-3.5 text-zinc-300 font-mono text-xs" title="${srv.last_seen || ''}">${relTime}</td>
+              <td class="px-6 py-3.5 text-slate-300 font-mono text-xs" title="${srv.last_seen || ''}">${relTime}</td>
               <td class="px-6 py-3.5 text-right space-x-2">
                 <button onclick="removeServerConnection('${srv.license_key}', '${srv.id}')" title="Disconnect Server"
-                  class="px-2.5 py-1 rounded-lg text-xs bg-[#1F1F1F] hover:bg-[#272727] text-zinc-300 hover:text-white transition-all border border-[#272727]">
+                  class="px-2.5 py-1 rounded-lg text-xs bg-surface-subtle hover:bg-surface-border text-slate-300 hover:text-white transition-all border border-surface-border">
                   <i class="ph-bold ph-link-break text-xs text-amber-400"></i> Disconnect
                 </button>
                 <button onclick="promptBanIp('${srv.ip}')" title="Ban Server IP"
-                  class="px-2.5 py-1 rounded-lg text-xs bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-500/20 transition-all">
-                  <i class="ph-bold ph-prohibit text-xs"></i> Ban IP
+                  class="px-2.5 py-1 rounded-lg text-xs bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-500/30 transition-all">
+                  <i class="ph-bold ph-prohibit text-xs text-rose-400"></i> Ban IP
                 </button>
               </td>
             </tr>
@@ -1267,23 +1276,24 @@
       }
     }
 
-    function renderBannedIpsTable() {
+    // Banned IPs Table
+    function renderBannedIps() {
       const tbody = document.getElementById('banned-ips-table-body');
-      if (globalBannedIps.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-8 text-center text-zinc-500">No IP addresses are currently blacklisted.</td></tr>';
+      if (!globalBannedIps || globalBannedIps.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-8 text-center text-slate-500">No banned IPs. The blacklist is empty.</td></tr>';
         return;
       }
 
-      tbody.innerHTML = globalBannedIps.map(b => {
-        const dateStr = b.banned_at ? new Date(b.banned_at).toLocaleString() : '—';
+      tbody.innerHTML = globalBannedIps.map(item => {
+        const dateStr = item.banned_at ? new Date(item.banned_at).toLocaleString() : '—';
         return `
-          <tr class="hover:bg-[#1F1F1F]/60">
-            <td class="px-6 py-3.5 font-mono text-red-400 font-medium">${b.ip}</td>
-            <td class="px-6 py-3.5 text-zinc-300">${escapeHtml(b.reason || 'No reason specified')}</td>
-            <td class="px-6 py-3.5 text-zinc-400 font-mono text-[11px]">${dateStr}</td>
-            <td class="px-6 py-3.5 text-right">
-              <button onclick="unbanIp('${b.ip}')" class="px-3 py-1 rounded-lg text-xs bg-[#1F1F1F] hover:bg-[#272727] text-zinc-300 hover:text-white border border-[#272727] transition-all">
-                <i class="ph-bold ph-check text-emerald-400"></i> Unban IP
+          <tr class="hover:bg-surface-subtle/50 transition-colors">
+            <td class="px-6 py-4 font-mono font-bold text-rose-400">${item.ip}</td>
+            <td class="px-6 py-4 text-slate-300">${escapeHtml(item.reason || 'Manual administrative ban')}</td>
+            <td class="px-6 py-4 font-mono text-slate-400 text-xs">${dateStr}</td>
+            <td class="px-6 py-4 text-right">
+              <button onclick="unbanIp('${item.ip}')" class="px-3 py-1 rounded-lg text-xs bg-surface-subtle hover:bg-surface-border text-slate-300 hover:text-white border border-surface-border">
+                <i class="ph-bold ph-arrow-counter-clockwise text-xs"></i> Unban
               </button>
             </td>
           </tr>
@@ -1291,31 +1301,31 @@
       }).join('');
     }
 
+    // Full Audit Logs Table
     function renderFullLogs() {
       const tbody = document.getElementById('full-logs-table-body');
-      if (globalLogs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-zinc-500">No validation requests logged yet.</td></tr>';
+      if (!globalLogs || globalLogs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-slate-500">No logs recorded yet.</td></tr>';
         return;
       }
 
       tbody.innerHTML = globalLogs.map(log => {
         const statusBadge = log.valid
-          ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">ALLOWED</span>'
-          : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/10 text-red-400 border border-red-500/20 font-mono">DENIED</span>';
+          ? '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-mono">ALLOWED</span>'
+          : `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30 font-mono">${escapeHtml(log.reason || 'DENIED')}</span>`;
 
-        const timeStr = log.timestamp ? new Date(log.timestamp).toLocaleString() : '—';
+        const dateStr = log.timestamp ? new Date(log.timestamp).toLocaleString() : '—';
 
         return `
-          <tr class="hover:bg-[#1F1F1F]/60">
-            <td class="px-6 py-3.5 text-zinc-400 font-mono text-[11px]">${timeStr}</td>
-            <td class="px-6 py-3.5 font-mono text-white text-[11px]">${log.key || '—'}</td>
-            <td class="px-6 py-3.5 font-mono text-zinc-300 text-[11px]">${log.ip || '—'}</td>
-            <td class="px-6 py-3.5 text-zinc-400 font-mono text-[11px]">${log.product || 'plugin'}</td>
+          <tr class="hover:bg-surface-subtle/50 transition-colors">
+            <td class="px-6 py-3.5 text-slate-400 font-mono text-xs">${dateStr}</td>
+            <td class="px-6 py-3.5 font-mono text-white text-xs">${log.key || '—'}</td>
+            <td class="px-6 py-3.5 font-mono text-slate-400 text-xs">${log.ip || '—'}</td>
+            <td class="px-6 py-3.5 text-slate-300 text-xs">${escapeHtml(log.product || 'plugin')}</td>
             <td class="px-6 py-3.5">${statusBadge}</td>
-            <td class="px-6 py-3.5 text-zinc-400 text-xs">${escapeHtml(log.reason || 'Valid request')}</td>
             <td class="px-6 py-3.5 text-right">
               ${log.ip && log.ip !== '127.0.0.1' ? `
-                <button onclick="promptBanIp('${log.ip}')" class="text-xs text-red-400 hover:text-red-300 font-semibold">Ban IP</button>
+                <button onclick="promptBanIp('${log.ip}')" class="text-xs text-rose-400 hover:text-rose-300 font-bold hover:underline">Ban IP</button>
               ` : '—'}
             </td>
           </tr>
@@ -1323,165 +1333,13 @@
       }).join('');
     }
 
-    // ---------------------- Real-Time Console SSE Stream ----------------------
-    function initConsoleStream() {
-      if (sseSource) return;
-
-      sseSource = new EventSource(`/api/admin/console/stream?token=${encodeURIComponent(token)}`);
-
-      sseSource.onopen = () => {
-        const badge = document.getElementById('console-stream-status');
-        if (badge) {
-          badge.className = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono';
-          badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> STREAM LIVE';
-        }
-      };
-
-      sseSource.onmessage = (event) => {
-        try {
-          const entry = JSON.parse(event.data);
-          appendConsoleEntry(entry);
-          if (entry.tag === 'LICENSE') {
-            refreshData();
-          }
-        } catch (e) {}
-      };
-
-      sseSource.onerror = () => {
-        const badge = document.getElementById('console-stream-status');
-        if (badge) {
-          badge.className = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-mono';
-          badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> RECONNECTING';
-        }
-      };
-    }
-
-    function renderConsoleInitial(logs) {
-      const output = document.getElementById('terminal-output');
-      output.innerHTML = '';
-      logs.forEach(log => appendConsoleEntry(log, false));
-      scrollConsoleToBottom();
-    }
-
-    function appendConsoleEntry(entry, autoScrollCheck = true) {
-      const output = document.getElementById('terminal-output');
-      if (!output) return;
-
-      const line = document.createElement('div');
-      line.className = 'flex items-start gap-2 hover:bg-[#181818]/60 px-1 py-0.5 rounded font-mono text-[11px] break-all';
-
-      let tagColor = 'text-blue-400';
-      if (entry.level === 'SUCCESS') tagColor = 'text-emerald-400';
-      if (entry.level === 'WARN') tagColor = 'text-amber-400';
-      if (entry.level === 'ERROR') tagColor = 'text-red-400';
-      if (entry.level === 'CMD') tagColor = 'text-cyan-400';
-
-      line.innerHTML = `
-        <span class="text-zinc-600 select-none text-[10px] shrink-0 pt-0.5">[${entry.time || '00:00:00'}]</span>
-        <span class="font-bold text-[10px] px-1.5 rounded bg-[#1F1F1F] border border-[#272727] ${tagColor} shrink-0 select-none">${entry.tag || 'SYSTEM'}</span>
-        <span class="text-zinc-300 flex-1 whitespace-pre-wrap">${escapeHtml(entry.message)}</span>
-      `;
-
-      output.appendChild(line);
-
-      if (autoScrollCheck && document.getElementById('auto-scroll-toggle').checked) {
-        scrollConsoleToBottom();
-      }
-    }
-
-    function scrollConsoleToBottom() {
-      const output = document.getElementById('terminal-output');
-      if (output) {
-        output.scrollTop = output.scrollHeight;
-      }
-    }
-
-    function clearConsoleView() {
-      const output = document.getElementById('terminal-output');
-      if (output) {
-        output.innerHTML = '<div class="text-zinc-500 select-none font-mono">Console view cleared. Waiting for new logs...</div>';
-      }
-    }
-
-    function updateConsoleTelemetry(telem) {
-      if (!telem) return;
-      const memEl = document.getElementById('telemetry-mem');
-      const upEl = document.getElementById('telemetry-uptime');
-      if (memEl) memEl.innerText = `RAM: ${telem.heapUsedMb} MB`;
-      if (upEl) {
-        const u = telem.uptimeSec;
-        const h = Math.floor(u / 3600);
-        const m = Math.floor((u % 3600) / 60);
-        const s = u % 60;
-        upEl.innerText = `UPTIME: ${h > 0 ? h + 'h ' : ''}${m}m ${s}s`;
-      }
-    }
-
-    function runConsoleCommand(cmd) {
-      document.getElementById('cmd-input').value = cmd;
-      handleCommandSubmit(new Event('submit'));
-    }
-
-    async function handleCommandSubmit(e) {
-      if (e && e.preventDefault) e.preventDefault();
-      const input = document.getElementById('cmd-input');
-      const raw = input.value.trim();
-      if (!raw) return;
-
-      commandHistory.push(raw);
-      historyIndex = commandHistory.length;
-      input.value = '';
-
-      try {
-        const res = await fetch('/api/admin/console/exec', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ command: raw })
-        });
-        const data = await res.json();
-        if (data.success && data.output) {
-          // command result is also broadcasted to SSE stream
-        }
-      } catch (err) {
-        showToast('CLI Error: ' + err.message, true);
-      }
-    }
-
-    // Keyboard History (Up / Down)
-    document.addEventListener('DOMContentLoaded', () => {
-      const cmdInput = document.getElementById('cmd-input');
-      if (cmdInput) {
-        cmdInput.addEventListener('keydown', (e) => {
-          if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            if (commandHistory.length > 0 && historyIndex > 0) {
-              historyIndex--;
-              cmdInput.value = commandHistory[historyIndex] || '';
-            }
-          } else if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            if (historyIndex < commandHistory.length - 1) {
-              historyIndex++;
-              cmdInput.value = commandHistory[historyIndex] || '';
-            } else {
-              historyIndex = commandHistory.length;
-              cmdInput.value = '';
-            }
-          }
-        });
-      }
-    });
-
-    // ---------------------- Modals & Actions ----------------------
+    // Modal Operations
     function openCreateModal() {
+      generateRandomKey();
       document.getElementById('create-owner').value = '';
-      document.getElementById('create-key').value = '';
       document.getElementById('create-tier').value = 'PREMIUM';
-      document.getElementById('create-max-servers').value = '3';
-      document.getElementById('create-ip-lock').checked = true;
+      document.getElementById('create-max-servers').value = '5';
+      document.getElementById('create-ip-lock').checked = false;
       document.getElementById('modal-create').classList.remove('hidden');
     }
 
@@ -1489,56 +1347,56 @@
       document.getElementById('modal-create').classList.add('hidden');
     }
 
+    function generateRandomKey() {
+      const seg = () => Math.random().toString(36).substring(2, 6).toUpperCase();
+      document.getElementById('create-key').value = `RS-${seg()}-${seg()}-${seg()}`;
+    }
+
     async function handleCreateLicense(e) {
       e.preventDefault();
-      const owner = document.getElementById('create-owner').value.trim();
-      const customKey = document.getElementById('create-key').value.trim();
-      const tier = document.getElementById('create-tier').value;
-      const maxInput = document.getElementById('create-max-servers').value.trim();
-      const max_servers = (maxInput && parseInt(maxInput, 10) > 0) ? parseInt(maxInput, 10) : 0;
-      const ip_lock = document.getElementById('create-ip-lock').checked;
+      const payload = {
+        key: document.getElementById('create-key').value.trim(),
+        owner: document.getElementById('create-owner').value.trim(),
+        tier: document.getElementById('create-tier').value,
+        max_servers: parseInt(document.getElementById('create-max-servers').value) || 0,
+        ip_lock: document.getElementById('create-ip-lock').checked
+      };
 
       try {
         const res = await fetch('/api/admin/licenses', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({ owner, key: customKey || undefined, tier, max_servers, ip_lock })
+          body: JSON.stringify(payload)
         });
-
+        const data = await res.json();
         if (res.ok) {
-          const data = await res.json();
-          showToast(`License created: ${data.license.key}`);
+          showToast('License created successfully!');
           closeCreateModal();
           refreshData();
         } else {
-          const d = await res.json();
-          showToast(d.error || 'Failed to create license', true);
+          showToast('Failed to create: ' + (data.error || 'Unknown error'), true);
         }
       } catch (err) {
         showToast('Error: ' + err.message, true);
       }
     }
 
-    // ---------------------- Edit License Info ----------------------
     function openEditModal(key) {
       const lic = globalLicenses.find(l => l.key === key);
-      if (!lic) {
-        showToast('License key not found: ' + key, true);
-        return;
-      }
+      if (!lic) return;
 
       document.getElementById('edit-orig-key').value = lic.key;
       document.getElementById('edit-key').value = lic.key;
       document.getElementById('edit-owner').value = lic.owner || '';
       document.getElementById('edit-status').value = lic.status || 'ACTIVE';
-      document.getElementById('edit-tier').value = lic.tier || 'STANDARD';
-      document.getElementById('edit-max-servers').value = (lic.max_servers && lic.max_servers > 0) ? lic.max_servers : 0;
+      document.getElementById('edit-tier').value = lic.tier || 'PREMIUM';
+      document.getElementById('edit-max-servers').value = (lic.max_servers !== undefined && lic.max_servers !== null) ? lic.max_servers : 0;
       document.getElementById('edit-bound-ip').value = lic.bound_ip || '';
+      document.getElementById('edit-ip-lock').checked = !!lic.ip_lock;
       document.getElementById('edit-note').value = lic.note || '';
-      document.getElementById('edit-ip-lock').checked = Boolean(lic.ip_lock);
 
       document.getElementById('modal-edit').classList.remove('hidden');
     }
@@ -1549,117 +1407,45 @@
 
     async function handleEditLicense(e) {
       e.preventDefault();
-      const origKey = document.getElementById('edit-orig-key').value.trim();
-      const newKey = document.getElementById('edit-key').value.trim();
-      const owner = document.getElementById('edit-owner').value.trim();
-      const status = document.getElementById('edit-status').value;
-      const tier = document.getElementById('edit-tier').value;
-      const maxInput = document.getElementById('edit-max-servers').value.trim();
-      const max_servers = (maxInput && parseInt(maxInput, 10) > 0) ? parseInt(maxInput, 10) : 0;
-      const bound_ip = document.getElementById('edit-bound-ip').value.trim() || null;
-      const note = document.getElementById('edit-note').value.trim();
-      const ip_lock = document.getElementById('edit-ip-lock').checked;
-
+      const origKey = document.getElementById('edit-orig-key').value;
       const btn = document.getElementById('edit-submit-btn');
+
+      const payload = {
+        key: document.getElementById('edit-key').value.trim(),
+        owner: document.getElementById('edit-owner').value.trim(),
+        status: document.getElementById('edit-status').value,
+        tier: document.getElementById('edit-tier').value,
+        max_servers: parseInt(document.getElementById('edit-max-servers').value) || 0,
+        bound_ip: document.getElementById('edit-bound-ip').value.trim() || null,
+        ip_lock: document.getElementById('edit-ip-lock').checked,
+        note: document.getElementById('edit-note').value.trim() || null
+      };
+
       btn.disabled = true;
-      btn.innerHTML = '<i class="ph-bold ph-arrows-clockwise animate-spin text-xs"></i> Saving...';
+      btn.innerHTML = '<i class="ph-bold ph-arrows-clockwise animate-spin"></i> Saving...';
 
       try {
-        const payload = {
-          new_key: (newKey !== origKey) ? newKey : undefined,
-          owner,
-          status,
-          tier,
-          max_servers,
-          bound_ip,
-          note,
-          ip_lock
-        };
-
         const res = await fetch(`/api/admin/licenses/${encodeURIComponent(origKey)}`, {
           method: 'PUT',
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify(payload)
         });
-
-        const data = await res.json().catch(() => ({}));
+        const data = await res.json();
         if (res.ok) {
-          showToast(`License ${data.license ? data.license.key : newKey} updated successfully!`);
+          showToast('License updated successfully!');
           closeEditModal();
           refreshData();
         } else {
-          showToast(data.error || 'Failed to update license', true);
+          showToast('Failed to update: ' + (data.error || 'Unknown error'), true);
         }
       } catch (err) {
         showToast('Error: ' + err.message, true);
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="ph-bold ph-check text-xs"></i> Save Changes';
-      }
-    }
-
-    async function toggleLicenseStatus(key, currentStatus) {
-      const newStatus = currentStatus === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
-      try {
-        const res = await fetch(`/api/admin/licenses/${key}`, {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ status: newStatus })
-        });
-
-        if (res.ok) {
-          showToast(`License is now ${newStatus}`);
-          refreshData();
-        } else {
-          showToast('Failed to update status', true);
-        }
-      } catch (err) {
-        showToast('Error: ' + err.message, true);
-      }
-    }
-
-    async function resetIpLock(key) {
-      if (!confirm(`Reset bound IP for ${key}? The next server to connect will bind its IP.`)) return;
-
-      try {
-        const res = await fetch(`/api/admin/licenses/${key}/reset-ip`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.ok) {
-          showToast(`IP lock reset for ${key}`);
-          refreshData();
-        } else {
-          showToast('Failed to reset IP lock', true);
-        }
-      } catch (err) {
-        showToast('Error: ' + err.message, true);
-      }
-    }
-
-    async function deleteLicense(key) {
-      if (!confirm(`Are you sure you want to permanently delete license ${key}? Any servers using this key will immediately be disabled.`)) return;
-
-      try {
-        const res = await fetch(`/api/admin/licenses/${key}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-
-        if (res.ok) {
-          showToast(`License ${key} removed`);
-          refreshData();
-        } else {
-          showToast('Failed to delete license', true);
-        }
-      } catch (err) {
-        showToast('Error: ' + err.message, true);
+        btn.innerHTML = 'Save Changes';
       }
     }
 
@@ -1673,18 +1459,18 @@
 
       const servers = lic.servers ? Object.values(lic.servers) : [];
       if (servers.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-center text-zinc-500">No servers have connected with this key yet.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-500">No servers have connected with this key yet.</td></tr>';
       } else {
         tbody.innerHTML = servers.map(srv => {
           const statusBadge = getServerStatusBadge(srv);
           const relTime = formatRelativeTime(srv.last_seen);
           const serverTitle = renderMinecraftMotd(srv.server_name || 'Minecraft Server');
           const motdText = (srv.motd && srv.motd !== srv.server_name)
-            ? `<div class="mt-1 px-2 py-0.5 rounded bg-[#0D0D0D] border border-[#242424] text-[10px] font-mono leading-relaxed inline-block text-zinc-300">${renderMinecraftMotd(srv.motd)}</div>`
+            ? `<div class="mt-1 px-2 py-0.5 rounded bg-[#05070E] border border-surface-border text-[10px] font-mono leading-relaxed inline-block text-slate-300">${renderMinecraftMotd(srv.motd)}</div>`
             : '';
 
           return `
-            <tr class="hover:bg-[#1F1F1F]/60">
+            <tr class="hover:bg-surface-subtle/50 transition-colors">
               <td class="px-4 py-2.5">${statusBadge}</td>
               <td class="px-4 py-2.5">
                 <div class="font-bold text-white text-xs">${serverTitle}</div>
@@ -1692,13 +1478,13 @@
               </td>
               <td class="px-4 py-2.5 font-mono text-purple-300 text-xs">${srv.online_players || 0} / ${srv.max_players || 0}</td>
               <td class="px-4 py-2.5 font-mono text-white text-xs">${srv.ip}:${srv.port || 25565}</td>
-              <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded bg-[#1F1F1F] text-zinc-300 text-[10px] font-mono border border-[#272727]">${srv.product || 'plugin'}</span></td>
-              <td class="px-4 py-2.5 text-zinc-300 font-mono text-[11px]" title="${srv.last_seen || ''}">${relTime}</td>
+              <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded bg-surface-subtle text-slate-300 text-[10px] font-mono border border-surface-border">${srv.product || 'plugin'}</span></td>
+              <td class="px-4 py-2.5 text-slate-300 font-mono text-[11px]" title="${srv.last_seen || ''}">${relTime}</td>
               <td class="px-4 py-2.5 text-right space-x-1.5">
-                <button onclick="removeServerConnection('${key}', '${srv.id}')" title="Disconnect Server" class="text-xs text-amber-400 hover:text-amber-300 font-medium">
-                  <i class="ph-bold ph-link-break"></i> Remove
+                <button onclick="removeServerConnection('${key}', '${srv.id}')" title="Disconnect Server" class="text-xs text-amber-400 hover:text-amber-300 font-bold">
+                  <i class="ph-bold ph-link-break"></i> Disconnect
                 </button>
-                <button onclick="promptBanIp('${srv.ip}')" title="Ban Server IP" class="text-xs text-red-400 hover:text-red-300 font-medium ml-2">
+                <button onclick="promptBanIp('${srv.ip}')" title="Ban Server IP" class="text-xs text-rose-400 hover:text-rose-300 font-bold ml-2">
                   <i class="ph-bold ph-prohibit"></i> Ban
                 </button>
               </td>
@@ -1715,31 +1501,28 @@
     }
 
     async function removeServerConnection(key, serverId) {
-      if (!confirm(`Disconnect server instance from license key ${key}?`)) return;
-
+      if (!confirm('Disconnect this server instance from the license?')) return;
       try {
-        const res = await fetch(`/api/admin/licenses/${key}/servers/${encodeURIComponent(serverId)}`, {
+        const res = await fetch(`/api/admin/licenses/${encodeURIComponent(key)}/servers/${encodeURIComponent(serverId)}`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         });
-
         if (res.ok) {
-          showToast(`Server disconnected`);
-          refreshData();
-          if (!document.getElementById('modal-key-servers').classList.contains('hidden')) {
+          showToast('Server connection severed.');
+          if (currentKeyForServers === key) {
             openServersModal(key);
           }
+          refreshData();
         } else {
-          showToast('Failed to disconnect server', true);
+          showToast('Failed to disconnect server.', true);
         }
       } catch (err) {
         showToast('Error: ' + err.message, true);
       }
     }
 
-    // IP Ban Handlers
-    function openBanModal() {
-      document.getElementById('ban-ip-input').value = '';
+    function openBanModal(ip = '') {
+      document.getElementById('ban-ip-input').value = ip;
       document.getElementById('ban-reason-input').value = '';
       document.getElementById('modal-ban').classList.remove('hidden');
     }
@@ -1749,12 +1532,10 @@
     }
 
     function promptBanIp(ip) {
-      document.getElementById('ban-ip-input').value = ip;
-      document.getElementById('ban-reason-input').value = 'Unauthorized server activity';
-      document.getElementById('modal-ban').classList.remove('hidden');
+      openBanModal(ip);
     }
 
-    async function handleBanIp(e) {
+    async function handleBanSubmit(e) {
       e.preventDefault();
       const ip = document.getElementById('ban-ip-input').value.trim();
       const reason = document.getElementById('ban-reason-input').value.trim();
@@ -1763,19 +1544,18 @@
         const res = await fetch('/api/admin/banned-ips', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({ ip, reason })
         });
-
         if (res.ok) {
-          showToast(`IP ${ip} has been blacklisted`);
+          showToast(`IP ${ip} blacklisted successfully.`);
           closeBanModal();
           refreshData();
         } else {
-          const d = await res.json();
-          showToast(d.error || 'Failed to ban IP', true);
+          const data = await res.json();
+          showToast('Ban failed: ' + (data.error || 'Unknown error'), true);
         }
       } catch (err) {
         showToast('Error: ' + err.message, true);
@@ -1783,19 +1563,17 @@
     }
 
     async function unbanIp(ip) {
-      if (!confirm(`Unban IP ${ip}?`)) return;
-
+      if (!confirm(`Are you sure you want to unban IP ${ip}?`)) return;
       try {
         const res = await fetch(`/api/admin/banned-ips/${encodeURIComponent(ip)}`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         });
-
         if (res.ok) {
-          showToast(`IP ${ip} unbanned`);
+          showToast(`Unbanned ${ip}`);
           refreshData();
         } else {
-          showToast('Failed to unban IP', true);
+          showToast('Failed to unban IP.', true);
         }
       } catch (err) {
         showToast('Error: ' + err.message, true);
@@ -1803,28 +1581,231 @@
     }
 
     async function clearLogs() {
-      if (!confirm('Clear all audit logs?')) return;
-
+      if (!confirm('Purge all historical validation logs?')) return;
       try {
         const res = await fetch('/api/admin/logs', {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {
-          showToast('Audit logs cleared');
+          showToast('Logs purged.');
           refreshData();
+        } else {
+          showToast('Failed to purge logs.', true);
         }
       } catch (err) {
         showToast('Error: ' + err.message, true);
       }
     }
 
+    async function toggleLicenseStatus(key, currentStatus) {
+      const newStatus = currentStatus === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
+      try {
+        const res = await fetch(`/api/admin/licenses/${encodeURIComponent(key)}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: newStatus })
+        });
+        if (res.ok) {
+          showToast(`License marked as ${newStatus}.`);
+          refreshData();
+        } else {
+          showToast('Failed to update status.', true);
+        }
+      } catch (err) {
+        showToast('Error: ' + err.message, true);
+      }
+    }
+
+    async function deleteLicense(key) {
+      if (!confirm(`Permanently delete license ${key}? This cannot be undone.`)) return;
+      try {
+        const res = await fetch(`/api/admin/licenses/${encodeURIComponent(key)}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          showToast('License deleted permanently.');
+          refreshData();
+        } else {
+          showToast('Failed to delete license.', true);
+        }
+      } catch (err) {
+        showToast('Error: ' + err.message, true);
+      }
+    }
+
+    async function resetIpLock(key) {
+      if (!confirm(`Reset the bound IP address for ${key}? The next connecting server will bind automatically.`)) return;
+      try {
+        const res = await fetch(`/api/admin/licenses/${encodeURIComponent(key)}/reset-ip`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          showToast('IP lock reset successfully.');
+          refreshData();
+        } else {
+          showToast('Failed to reset IP lock.', true);
+        }
+      } catch (err) {
+        showToast('Error: ' + err.message, true);
+      }
+    }
+
+    // Terminal Interactive CLI
+    function initConsoleStream() {
+      if (sseSource) {
+        sseSource.close();
+      }
+
+      const streamStatus = document.getElementById('console-stream-status');
+      sseSource = new EventSource(`/api/admin/console/stream?token=${encodeURIComponent(token)}`);
+
+      sseSource.onopen = () => {
+        if (streamStatus) {
+          streamStatus.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> STREAM LIVE';
+          streamStatus.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold';
+        }
+      };
+
+      sseSource.onmessage = (event) => {
+        try {
+          const item = JSON.parse(event.data);
+          appendTerminalLine(item);
+        } catch (e) {}
+      };
+
+      sseSource.addEventListener('telemetry', (event) => {
+        try {
+          const telem = JSON.parse(event.data);
+          const memEl = document.getElementById('telemetry-mem');
+          const upEl = document.getElementById('telemetry-uptime');
+          if (memEl) memEl.innerText = `RAM: ${telem.rssMb || 0} MB`;
+          if (upEl) upEl.innerText = `UPTIME: ${formatSeconds(telem.uptimeSec || 0)}`;
+        } catch (e) {}
+      });
+
+      sseSource.onerror = () => {
+        if (streamStatus) {
+          streamStatus.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> RECONNECTING';
+          streamStatus.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/30 text-[10px] font-bold';
+        }
+      };
+    }
+
+    function appendTerminalLine(log) {
+      const out = document.getElementById('terminal-output');
+      if (!out) return;
+
+      const line = document.createElement('div');
+      const timeStr = log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : '';
+
+      let colorClass = 'text-slate-200';
+      if (log.level === 'warn') colorClass = 'text-amber-400';
+      if (log.level === 'error') colorClass = 'text-rose-400 font-bold';
+      if (log.level === 'success') colorClass = 'text-emerald-400 font-bold';
+      if (log.level === 'info') colorClass = 'text-brand-cyan';
+
+      line.className = `leading-relaxed font-mono ${colorClass}`;
+      line.innerHTML = `<span class="text-slate-600 select-none mr-2">[${timeStr}]</span>${escapeHtml(log.message || '')}`;
+
+      out.appendChild(line);
+
+      const autoScroll = document.getElementById('auto-scroll-toggle');
+      if (!autoScroll || autoScroll.checked) {
+        scrollConsoleToBottom();
+      }
+    }
+
+    function scrollConsoleToBottom() {
+      const out = document.getElementById('terminal-output');
+      if (out) out.scrollTop = out.scrollHeight;
+    }
+
+    function insertCommand(cmd) {
+      const input = document.getElementById('cmd-input');
+      if (input) {
+        input.value = cmd;
+        input.focus();
+      }
+    }
+
+    function clearConsole() {
+      const out = document.getElementById('terminal-output');
+      if (out) {
+        out.innerHTML = '<div class="text-slate-500">// Buffer cleared.</div>';
+      }
+    }
+
+    async function handleCommandSubmit(e) {
+      e.preventDefault();
+      const input = document.getElementById('cmd-input');
+      const cmd = input.value.trim();
+      if (!cmd) return;
+
+      commandHistory.push(cmd);
+      historyIndex = commandHistory.length;
+      input.value = '';
+
+      if (cmd.toLowerCase() === 'clear') {
+        clearConsole();
+        return;
+      }
+
+      const out = document.getElementById('terminal-output');
+      const userLine = document.createElement('div');
+      userLine.className = 'text-white font-mono font-bold pt-1';
+      userLine.innerHTML = `<span class="text-emerald-400 font-bold">&gt;</span> ${escapeHtml(cmd)}`;
+      out.appendChild(userLine);
+      scrollConsoleToBottom();
+
+      try {
+        const res = await fetch('/api/admin/console/exec', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ command: cmd })
+        });
+        const data = await res.json();
+        if (data.output) {
+          const respLine = document.createElement('div');
+          respLine.className = 'font-mono text-slate-300 whitespace-pre-wrap';
+          respLine.innerText = data.output;
+          out.appendChild(respLine);
+        }
+      } catch (err) {
+        const errLine = document.createElement('div');
+        errLine.className = 'font-mono text-rose-400';
+        errLine.innerText = 'Execution error: ' + err.message;
+        out.appendChild(errLine);
+      }
+      scrollConsoleToBottom();
+    }
+
+    // Utilities
     function copyToClipboard(text) {
       navigator.clipboard.writeText(text).then(() => {
         showToast('Copied to clipboard: ' + text);
       }).catch(() => {
-        showToast('Could not copy to clipboard', true);
+        showToast('Failed to copy', true);
       });
+    }
+
+    function formatSeconds(sec) {
+      const d = Math.floor(sec / 86400);
+      const h = Math.floor((sec % 86400) / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = Math.floor(sec % 60);
+      if (d > 0) return `${d}d ${h}h`;
+      if (h > 0) return `${h}h ${m}m`;
+      if (m > 0) return `${m}m ${s}s`;
+      return `${s}s`;
     }
 
     function escapeHtml(str) {
@@ -1835,7 +1816,7 @@
       return (str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
     }
 
-    // ---------------------- Minecraft MOTD & Color Code Parser ----------------------
+    // Minecraft MOTD & Color Code Parser
     function stripMinecraftFormatting(raw) {
       if (!raw) return '';
       return String(raw)
@@ -1850,7 +1831,6 @@
     function renderMinecraftMotd(raw) {
       if (!raw) return '';
 
-      // Normalize missing section symbols, e.g. "4§l" -> "§4§l"
       let text = String(raw).replace(/(^|[^§&])([0-9a-fk-orA-FK-OR])§([0-9a-fk-orA-FK-OR])/gi, '$1§$2§$3');
 
       const mcColors = {
@@ -1860,114 +1840,78 @@
         'c': '#FF5555', 'd': '#FF55FF', 'e': '#FFFF55', 'f': '#FFFFFF'
       };
 
-      // Convert Spigot/Bungee §x§r§r§g§g§b§b to §#rrggbb
       text = text.replace(/§x§([0-9a-fA-F])§([0-9a-fA-F])§([0-9a-fA-F])§([0-9a-fA-F])§([0-9a-fA-F])§([0-9a-fA-F])/gi, (m, r1, r2, g1, g2, b1, b2) => {
         return `§#${r1}${r2}${g1}${g2}${b1}${b2}`;
       });
 
-      // Convert MiniMessage &#rrggbb and <#rrggbb> to §#rrggbb
       text = text.replace(/[<&]#([0-9a-fA-F]{6})>?/gi, '§#$1');
 
-      let currentColor = null;
+      let currentColor = '#FFFFFF';
       let isBold = false;
       let isItalic = false;
       let isUnderline = false;
-      let isStrike = false;
+      let isStrikethrough = false;
+      let isObfuscated = false;
 
       let html = '';
-      let buffer = '';
+      const tokens = text.split(/([§&](?:#[0-9a-fA-F]{6}|[0-9a-fk-orA-FK-OR]))/g);
 
-      function flush() {
-        if (!buffer) return;
-        const style = [];
-        if (currentColor) style.push(`color: ${currentColor}`);
-        if (isBold) style.push(`font-weight: 700`);
-        if (isItalic) style.push(`font-style: italic`);
-        const textDec = [];
-        if (isUnderline) textDec.push(`underline`);
-        if (isStrike) textDec.push(`line-through`);
-        if (textDec.length > 0) style.push(`text-decoration: ${textDec.join(' ')}`);
+      for (let token of tokens) {
+        if (!token) continue;
 
-        // Strictly escape plain text buffer to prevent XSS
-        const escaped = buffer.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-        if (style.length > 0) {
-          html += `<span style="${style.join('; ')}">${escaped}</span>`;
-        } else {
-          html += escaped;
-        }
-        buffer = '';
-      }
+        if (token.startsWith('§') || token.startsWith('&')) {
+          const code = token.slice(1);
 
-      let i = 0;
-      while (i < text.length) {
-        if (text[i] === '\n') {
-          flush();
-          html += '<br>';
-          i++;
-          continue;
-        }
-        if (text[i] === '\r') {
-          i++;
-          continue;
-        }
-
-        if (text[i] === '§' || text[i] === '&') {
-          // Check for §#rrggbb hex color
-          if (text[i + 1] === '#' && i + 8 <= text.length) {
-            const hex = text.substr(i + 1, 7);
-            if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
-              flush();
-              currentColor = hex;
-              i += 8;
-              continue;
-            }
-          }
-
-          // Check single character code
-          if (i + 1 < text.length) {
-            const code = text[i + 1].toLowerCase();
-            if (mcColors[code] !== undefined) {
-              flush();
-              currentColor = mcColors[code];
-              i += 2;
-              continue;
-            } else if (code === 'l') {
-              flush();
-              isBold = true;
-              i += 2;
-              continue;
-            } else if (code === 'o') {
-              flush();
-              isItalic = true;
-              i += 2;
-              continue;
-            } else if (code === 'n') {
-              flush();
-              isUnderline = true;
-              i += 2;
-              continue;
-            } else if (code === 'm') {
-              flush();
-              isStrike = true;
-              i += 2;
-              continue;
-            } else if (code === 'r') {
-              flush();
-              currentColor = null;
+          if (code.startsWith('#')) {
+            currentColor = code;
+          } else {
+            const char = code.toLowerCase();
+            if (mcColors[char]) {
+              currentColor = mcColors[char];
               isBold = false;
               isItalic = false;
               isUnderline = false;
-              isStrike = false;
-              i += 2;
-              continue;
+              isStrikethrough = false;
+              isObfuscated = false;
+            } else if (char === 'l') {
+              isBold = true;
+            } else if (char === 'o') {
+              isItalic = true;
+            } else if (char === 'n') {
+              isUnderline = true;
+            } else if (char === 'm') {
+              isStrikethrough = true;
+            } else if (char === 'k') {
+              isObfuscated = true;
+            } else if (char === 'r') {
+              currentColor = '#FFFFFF';
+              isBold = false;
+              isItalic = false;
+              isUnderline = false;
+              isStrikethrough = false;
+              isObfuscated = false;
             }
           }
-        }
+        } else {
+          let styles = [];
+          if (currentColor) styles.push(`color:${currentColor}`);
+          if (isBold) styles.push('font-weight:bold');
+          if (isItalic) styles.push('font-style:italic');
+          let textDecor = [];
+          if (isUnderline) textDecor.push('underline');
+          if (isStrikethrough) textDecor.push('line-through');
+          if (textDecor.length) styles.push(`text-decoration:${textDecor.join(' ')}`);
 
-        buffer += text[i];
-        i++;
+          const escaped = escapeHtml(token);
+          const styleAttr = styles.length ? ` style="${styles.join(';')}"` : '';
+
+          if (isObfuscated) {
+            html += `<span class="animate-pulse"${styleAttr}>${escaped}</span>`;
+          } else {
+            html += `<span${styleAttr}>${escaped}</span>`;
+          }
+        }
       }
-      flush();
 
       return html;
     }
