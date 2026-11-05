@@ -685,15 +685,53 @@ app.post('/api/license/validate', validateLimiter, async (req, res) => {
   }
 
   // Handle graceful shutdown notice
-  const serverId = `${clientIp}:${port || 25565}`;
-  if (status === 'OFFLINE') {
-    if (license.servers && license.servers[serverId]) {
-      license.servers[serverId].status = 'OFFLINE';
-      license.servers[serverId].last_seen = new Date().toISOString();
-      license.servers[serverId].online_players = 0;
-      await saveLicenseDB(license);
+  // --- NAT-aware server identity: collapse rotating egress IPs into one entry ---
+  // Two servers are the same physical node when they share the same port AND
+  // either the same server_name or the same /24 subnet.
+  const effectivePort = port || 25565;
+  const clientSubnet = clientIp.replace(/\.\d+$/, '');
+  const incomingName = (server_name && server_name.trim()) ? server_name.trim() : (motd && motd.trim() ? motd.trim() : '');
+
+  function findExistingServerId(servers) {
+    if (!servers) return null;
+    for (const [sid, s] of Object.entries(servers)) {
+      if (!s || (s.port || 25565) !== effectivePort) continue;
+      const sSubnet = (s.ip || '').replace(/\.\d+$/, '');
+      const sName = s.server_name || '';
+      if ((incomingName && sName === incomingName) || (sSubnet && sSubnet === clientSubnet)) {
+        return sid;
+      }
     }
-    pushConsole('INFO', 'LICENSE', `⚪ Server ${serverId} (${product || 'plugin'}) disconnected [OFFLINE]`);
+    return null;
+  }
+
+  const canonicalId = `${clientIp}:${effectivePort}`;
+
+  if (status === 'OFFLINE') {
+    if (license.servers) {
+      const existId = findExistingServerId(license.servers) || canonicalId;
+      if (license.servers[existId]) {
+        license.servers[existId].status = 'OFFLINE';
+        license.servers[existId].last_seen = new Date().toISOString();
+        license.servers[existId].online_players = 0;
+        license.servers[existId].ip = clientIp;
+        // Remove any other entries for the same logical server
+        for (const sid of Object.keys(license.servers)) {
+          if (sid !== existId && license.servers[sid]) {
+            const s = license.servers[sid];
+            if ((s.port || 25565) === effectivePort) {
+              const sSubnet = (s.ip || '').replace(/\.\d+$/, '');
+              const sName = s.server_name || '';
+              if ((incomingName && sName === incomingName) || (sSubnet && sSubnet === clientSubnet)) {
+                delete license.servers[sid];
+              }
+            }
+          }
+        }
+        await saveLicenseDB(license);
+      }
+    }
+    pushConsole('INFO', 'LICENSE', `⚪ Server ${canonicalId} (${product || 'plugin'}) disconnected [OFFLINE]`);
     return res.status(200).json({
       valid: true,
       status: 'OFFLINE',
@@ -749,7 +787,32 @@ app.post('/api/license/validate', validateLimiter, async (req, res) => {
     return true;
   });
 
-  if (typeof license.max_servers === 'number' && license.max_servers > 0 && !license.servers[serverId] && activeServerIds.length >= license.max_servers) {
+  // Find existing entry for this physical server (NAT-aware)
+  const existingServerId = findExistingServerId(license.servers);
+
+  // If reusing an old key that differs from canonicalId, migrate: delete old, use new key
+  if (existingServerId && existingServerId !== canonicalId) {
+    const oldData = license.servers[existingServerId];
+    delete license.servers[existingServerId];
+    license.servers[canonicalId] = oldData;
+  }
+  // Also remove any OTHER duplicate entries for this same logical server
+  for (const sid of Object.keys(license.servers)) {
+    if (sid !== canonicalId && license.servers[sid]) {
+      const s = license.servers[sid];
+      if ((s.port || 25565) === effectivePort) {
+        const sSubnet = (s.ip || '').replace(/\.\d+$/, '');
+        const sName = s.server_name || '';
+        if ((incomingName && sName === incomingName) || (sSubnet && sSubnet === clientSubnet)) {
+          delete license.servers[sid];
+        }
+      }
+    }
+  }
+
+  const isKnownServer = !!license.servers[canonicalId];
+
+  if (typeof license.max_servers === 'number' && license.max_servers > 0 && !isKnownServer && activeServerIds.length >= license.max_servers) {
     pushConsole('WARN', 'LICENSE', `⚠️ Server limit exceeded for ${license.key}: ${activeServerIds.length}/${license.max_servers}`);
     logValidation({ key: effectiveKey, valid: false, reason: `Max server limit reached (${activeServerIds.length}/${license.max_servers})`, ip: clientIp, port, product }).catch(() => {});
     return res.status(200).json({
@@ -761,14 +824,14 @@ app.post('/api/license/validate', validateLimiter, async (req, res) => {
 
   const nodeName = (server_name && server_name.trim()) ? server_name.trim() : (motd && motd.trim() ? motd.trim() : 'Minecraft Server');
   const nodeVersion = (server_version && server_version.trim()) ? server_version.trim() : 'Unknown';
-  const playersCount = (typeof online_players === 'number') ? Math.max(0, online_players) : (license.servers[serverId]?.online_players || 0);
-  const maxCap = (typeof max_players === 'number') ? Math.max(0, max_players) : (license.servers[serverId]?.max_players || 0);
+  const playersCount = (typeof online_players === 'number') ? Math.max(0, online_players) : (license.servers[canonicalId]?.online_players || 0);
+  const maxCap = (typeof max_players === 'number') ? Math.max(0, max_players) : (license.servers[canonicalId]?.max_players || 0);
 
-  // 6. Record connected server
-  license.servers[serverId] = {
-    id: serverId,
+  // 6. Record connected server (single entry, updated in place)
+  license.servers[canonicalId] = {
+    id: canonicalId,
     ip: clientIp,
-    port: port || 25565,
+    port: effectivePort,
     product: product || 'rslogin',
     server_name: nodeName,
     server_version: nodeVersion,
@@ -776,7 +839,7 @@ app.post('/api/license/validate', validateLimiter, async (req, res) => {
     online_players: playersCount,
     max_players: maxCap,
     status: 'ONLINE',
-    first_seen: license.servers[serverId]?.first_seen || new Date().toISOString(),
+    first_seen: license.servers[canonicalId]?.first_seen || new Date().toISOString(),
     last_seen: new Date().toISOString()
   };
   await saveLicenseDB(license);
@@ -784,8 +847,8 @@ app.post('/api/license/validate', validateLimiter, async (req, res) => {
   const timestamp = Math.floor(Date.now() / 1000);
   const signature = generateSignature(license.key, license.status, timestamp);
 
-  pushConsole('SUCCESS', 'LICENSE', `🟢 Server "${nodeName}" [${serverId}] (${product || 'rslogin'}, ${playersCount}/${maxCap} players) verified key ${license.key} [${license.owner}]`);
-  logValidation({ key: effectiveKey, valid: true, owner: license.owner, ip: clientIp, port: port || 25565, server_name: nodeName, product }).catch(() => {});
+  pushConsole('SUCCESS', 'LICENSE', `🟢 Server "${nodeName}" [${canonicalId}] (${product || 'rslogin'}, ${playersCount}/${maxCap} players) verified key ${license.key} [${license.owner}]`);
+  logValidation({ key: effectiveKey, valid: true, owner: license.owner, ip: clientIp, port: effectivePort, server_name: nodeName, product }).catch(() => {});
 
   return res.status(200).json({
     valid: true,

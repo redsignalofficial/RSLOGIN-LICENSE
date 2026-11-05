@@ -1140,15 +1140,16 @@
       renderLicensesTable(filtered);
     }
 
-    // Deduplicate logs strictly: ONE row per server node (same IP + same Port = just one row)
+    // Deduplicate logs: ONE row per logical server (same server_name + port)
     function deduplicateServerLogs(list) {
       if (!Array.isArray(list)) return [];
       const map = new Map();
       for (const log of list) {
         const ip = (log.ip || '—').trim();
         const port = log.port ? String(log.port).trim() : '25565';
-        // Key strictly by IP:Port so same IP and same port are NEVER shown multiple times
-        const serverKey = `${ip}:${port}`;
+        const name = (log.server_name || 'Server').toLowerCase().trim();
+        // Key by server_name + port so NAT-rotated IPs collapse into one row
+        const serverKey = `${name}@${port}`;
 
         if (!map.has(serverKey)) {
           map.set(serverKey, {
@@ -1251,12 +1252,12 @@
       const serverMap = new Map();
       const list = Array.isArray(globalLicenses) ? globalLicenses : [];
 
-      // Strictly deduplicate by same IP + same Port: only show JUST ONE row per server node
+      // Deduplicate by server_name + port to collapse NAT-rotated IPs into one row
       list.forEach(lic => {
         if (lic && lic.servers) {
           Object.values(lic.servers).forEach(srv => {
             if (srv && srv.ip) {
-              const nodeKey = `${srv.ip}:${srv.port || 25565}`;
+              const nodeKey = `${(srv.server_name || 'Server').toLowerCase()}@${srv.port || 25565}`;
               if (!serverMap.has(nodeKey)) {
                 serverMap.set(nodeKey, {
                   ...srv,
