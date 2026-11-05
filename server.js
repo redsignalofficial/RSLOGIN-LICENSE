@@ -3,6 +3,7 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { Pool } = require('pg');
 require('dotenv').config();
 
 const app = express();
@@ -14,9 +15,87 @@ const CLIENT_API_KEYS = new Set([
   'rslogin-api-key-2026'
 ].filter(Boolean));
 const SECRET_SIGN_KEY = process.env.SECRET_SIGN_KEY || 'rslogin-sign-key-2026';
-const DATA_FILE = path.join(__dirname, 'data', 'licenses.json');
-const LOGS_FILE = path.join(__dirname, 'data', 'logs.json');
-const BANNED_IPS_FILE = path.join(__dirname, 'data', 'banned_ips.json');
+const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_2RnsoCcOGzm5@ep-spring-cloud-a1flxsrk-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
+
+// ---------------------- PostgreSQL Connection Pool ----------------------
+const pool = new Pool({ connectionString: DATABASE_URL });
+
+pool.on('error', (err) => {
+  console.error('PostgreSQL pool error:', err.message);
+});
+
+// Initialize DB tables and seed default key
+async function initDB() {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS licenses (
+        key TEXT PRIMARY KEY,
+        owner TEXT NOT NULL DEFAULT 'Customer',
+        tier TEXT NOT NULL DEFAULT 'STANDARD',
+        status TEXT NOT NULL DEFAULT 'ACTIVE',
+        max_servers INT,
+        ip_lock BOOLEAN DEFAULT FALSE,
+        bound_ip TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        expires_at TIMESTAMPTZ,
+        note TEXT DEFAULT '',
+        servers JSONB DEFAULT '{}',
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS banned_ips (
+        ip TEXT PRIMARY KEY,
+        reason TEXT DEFAULT 'Administrative ban',
+        banned_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS validation_logs (
+        id SERIAL PRIMARY KEY,
+        license_key TEXT NOT NULL,
+        valid BOOLEAN NOT NULL,
+        ip TEXT,
+        port INT,
+        server_name TEXT,
+        product TEXT,
+        reason TEXT,
+        owner TEXT,
+        count INT DEFAULT 1,
+        last_seen TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(license_key, ip)
+      );
+    `);
+
+    // Seed default master key if not present
+    await client.query(`
+      INSERT INTO licenses (key, owner, tier, status, max_servers, ip_lock, bound_ip, created_at, expires_at, note, servers)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      ON CONFLICT (key) DO NOTHING
+    `, [
+      'RS-DEFAULT-PREMIUM-KEY-2026',
+      'ServerOwner',
+      'PREMIUM',
+      'ACTIVE',
+      null,
+      false,
+      null,
+      new Date().toISOString(),
+      null,
+      'Default master key (Unlimited servers)',
+      '{}'
+    ]);
+
+    console.log('🗄️ PostgreSQL connected and tables ready.');
+    pushConsole('SUCCESS', 'DB', '🗄️ PostgreSQL connected and tables ready.');
+  } catch (err) {
+    console.error(`❌ Database init error: ${err.message}`);
+    pushConsole('ERROR', 'DB', `❌ Database init error: ${err.message}`);
+  } finally {
+    client.release();
+  }
+}
 
 // ---------------------- HTTP Security & Server Hardening ----------------------
 app.disable('x-powered-by');
@@ -241,9 +320,9 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-// Ensure data folder and files exist
-if (!fs.existsSync(path.join(__dirname, 'data'))) {
-  fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true });
+// Ensure public folder exists for icon serving
+if (!fs.existsSync(path.join(__dirname, 'public'))) {
+  fs.mkdirSync(path.join(__dirname, 'public'), { recursive: true });
 }
 
 // ---------------------- Real-Time Console Buffer & Streaming ----------------------
@@ -293,107 +372,189 @@ console.warn = (...args) => {
   pushConsole('WARN', 'SYSTEM', args.join(' '));
 };
 
-function loadLicenses() {
-  let licenses = {};
+// ---------------------- Database Helpers (PostgreSQL async) ----------------------
+
+function dbRowToLicense(row) {
+  if (!row) return null;
+  return {
+    key: row.key,
+    owner: row.owner,
+    tier: row.tier,
+    status: row.status,
+    max_servers: row.max_servers,
+    ip_lock: row.ip_lock,
+    bound_ip: row.bound_ip,
+    created_at: row.created_at ? row.created_at.toISOString() : null,
+    expires_at: row.expires_at ? row.expires_at.toISOString() : null,
+    note: row.note || '',
+    servers: row.servers || {},
+    updated_at: row.updated_at ? row.updated_at.toISOString() : null
+  };
+}
+
+async function getLicense(key) {
   try {
-    if (fs.existsSync(DATA_FILE)) {
-      const content = fs.readFileSync(DATA_FILE, 'utf8');
-      licenses = JSON.parse(content) || {};
+    const { rows } = await pool.query('SELECT * FROM licenses WHERE key = $1', [key]);
+    return rows[0] ? dbRowToLicense(rows[0]) : null;
+  } catch (err) {
+    console.error('DB getLicense error:', err.message);
+    return null;
+  }
+}
+
+async function getAllLicenses() {
+  try {
+    const { rows } = await pool.query('SELECT * FROM licenses ORDER BY created_at DESC');
+    const result = {};
+    for (const row of rows) {
+      const lic = dbRowToLicense(row);
+      result[lic.key] = lic;
     }
+    return result;
   } catch (err) {
-    console.error('Error reading licenses file:', err.message);
-    licenses = {};
-  }
-
-  // Always ensure RS-DEFAULT-PREMIUM-KEY-2026 is loaded and active
-  const DEFAULT_KEY = 'RS-DEFAULT-PREMIUM-KEY-2026';
-  if (!licenses[DEFAULT_KEY] || typeof licenses[DEFAULT_KEY] !== 'object') {
-    licenses[DEFAULT_KEY] = {
-      key: DEFAULT_KEY,
-      owner: 'ServerOwner',
-      tier: 'PREMIUM',
-      status: 'ACTIVE',
-      ip_lock: false,
-      bound_ip: null,
-      max_servers: null, // Unlimited servers
-      created_at: new Date().toISOString(),
-      expires_at: null,
-      note: 'Default master key (Unlimited servers)',
-      servers: {}
-    };
-    saveLicenses(licenses);
-  }
-
-  return licenses;
-}
-
-function saveLicenses(licenses) {
-  try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(licenses, null, 2), 'utf8');
-  } catch (err) {
-    console.error('Error saving licenses file:', err.message);
+    console.error('DB getAllLicenses error:', err.message);
+    return {};
   }
 }
 
-function loadBannedIps() {
+async function saveLicenseDB(lic) {
   try {
-    if (fs.existsSync(BANNED_IPS_FILE)) {
-      return JSON.parse(fs.readFileSync(BANNED_IPS_FILE, 'utf8'));
+    await pool.query(`
+      INSERT INTO licenses (key, owner, tier, status, max_servers, ip_lock, bound_ip, created_at, expires_at, note, servers, updated_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())
+      ON CONFLICT (key) DO UPDATE SET
+        owner = EXCLUDED.owner,
+        tier = EXCLUDED.tier,
+        status = EXCLUDED.status,
+        max_servers = EXCLUDED.max_servers,
+        ip_lock = EXCLUDED.ip_lock,
+        bound_ip = EXCLUDED.bound_ip,
+        expires_at = EXCLUDED.expires_at,
+        note = EXCLUDED.note,
+        servers = EXCLUDED.servers,
+        updated_at = NOW()
+    `, [
+      lic.key,
+      lic.owner || 'Customer',
+      lic.tier || 'STANDARD',
+      lic.status || 'ACTIVE',
+      lic.max_servers || null,
+      lic.ip_lock || false,
+      lic.bound_ip || null,
+      lic.created_at || new Date().toISOString(),
+      lic.expires_at || null,
+      lic.note || '',
+      JSON.stringify(lic.servers || {})
+    ]);
+  } catch (err) {
+    console.error('DB saveLicense error:', err.message);
+  }
+}
+
+async function deleteLicenseDB(key) {
+  try {
+    await pool.query('DELETE FROM licenses WHERE key = $1', [key]);
+  } catch (err) {
+    console.error('DB deleteLicense error:', err.message);
+  }
+}
+
+async function getBannedIpsDB() {
+  try {
+    const { rows } = await pool.query('SELECT * FROM banned_ips');
+    const result = {};
+    for (const row of rows) {
+      result[row.ip] = {
+        ip: row.ip,
+        reason: row.reason,
+        banned_at: row.banned_at ? row.banned_at.toISOString() : null
+      };
     }
+    return result;
   } catch (err) {
-    console.error('Error reading banned_ips file:', err.message);
-  }
-  return {};
-}
-
-function saveBannedIps(banned) {
-  try {
-    fs.writeFileSync(BANNED_IPS_FILE, JSON.stringify(banned, null, 2), 'utf8');
-  } catch (err) {
-    console.error('Error saving banned_ips file:', err.message);
+    console.error('DB getBannedIps error:', err.message);
+    return {};
   }
 }
 
-function logValidation(entry) {
+async function banIpDB(ip, reason) {
   try {
-    let logs = [];
-    if (fs.existsSync(LOGS_FILE)) {
-      try {
-        logs = JSON.parse(fs.readFileSync(LOGS_FILE, 'utf8'));
-      } catch (e) {
-        logs = [];
-      }
-    }
+    await pool.query(`
+      INSERT INTO banned_ips (ip, reason, banned_at) VALUES ($1, $2, NOW())
+      ON CONFLICT (ip) DO UPDATE SET reason = EXCLUDED.reason, banned_at = NOW()
+    `, [ip.trim(), reason || 'Administrative ban']);
+  } catch (err) {
+    console.error('DB banIp error:', err.message);
+  }
+}
 
+async function unbanIpDB(ip) {
+  try {
+    await pool.query('DELETE FROM banned_ips WHERE ip = $1', [ip.trim()]);
+  } catch (err) {
+    console.error('DB unbanIp error:', err.message);
+  }
+}
+
+async function logValidation(entry) {
+  try {
     const targetKey = (entry.key || 'UNKNOWN').trim();
     const targetIp = (entry.ip || '').trim();
-
-    // Look for existing log from this server (matched by key and IP)
-    const existingIndex = logs.findIndex(l => (l.key || '').trim() === targetKey && (l.ip || '').trim() === targetIp);
-
-    if (existingIndex !== -1) {
-      const existing = logs[existingIndex];
-      const updated = {
-        ...existing,
-        ...entry,
-        count: (existing.count || 1) + 1,
-        timestamp: new Date().toISOString()
-      };
-      // Move updated server record to the top
-      logs.splice(existingIndex, 1);
-      logs.unshift(updated);
-    } else {
-      logs.unshift({
-        ...entry,
-        count: 1,
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    if (logs.length > 200) logs = logs.slice(0, 200);
-    fs.writeFileSync(LOGS_FILE, JSON.stringify(logs, null, 2), 'utf8');
+    await pool.query(`
+      INSERT INTO validation_logs (license_key, valid, ip, port, server_name, product, reason, owner, count, last_seen)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, NOW())
+      ON CONFLICT (license_key, ip) DO UPDATE SET
+        valid = EXCLUDED.valid,
+        port = COALESCE(EXCLUDED.port, validation_logs.port),
+        server_name = COALESCE(EXCLUDED.server_name, validation_logs.server_name),
+        product = COALESCE(EXCLUDED.product, validation_logs.product),
+        reason = EXCLUDED.reason,
+        owner = COALESCE(EXCLUDED.owner, validation_logs.owner),
+        count = validation_logs.count + 1,
+        last_seen = NOW()
+    `, [
+      targetKey,
+      entry.valid,
+      targetIp,
+      entry.port || null,
+      entry.server_name || null,
+      entry.product || null,
+      entry.reason || null,
+      entry.owner || null
+    ]);
   } catch (err) {
-    // Non-critical
+    // Non-critical: log silently
+  }
+}
+
+async function getValidationLogsDB() {
+  try {
+    const { rows } = await pool.query(
+      'SELECT * FROM validation_logs ORDER BY last_seen DESC LIMIT 200'
+    );
+    return rows.map(row => ({
+      key: row.license_key,
+      valid: row.valid,
+      ip: row.ip,
+      port: row.port,
+      server_name: row.server_name,
+      product: row.product,
+      reason: row.reason,
+      owner: row.owner,
+      count: row.count,
+      timestamp: row.last_seen ? row.last_seen.toISOString() : null
+    }));
+  } catch (err) {
+    console.error('DB getLogs error:', err.message);
+    return [];
+  }
+}
+
+async function clearValidationLogsDB() {
+  try {
+    await pool.query('TRUNCATE validation_logs RESTART IDENTITY');
+  } catch (err) {
+    console.error('DB clearLogs error:', err.message);
   }
 }
 
@@ -421,7 +582,7 @@ app.get('/health', (req, res) => {
 
 // ---------------------- License Validation Endpoint ----------------------
 // Called by Minecraft Paper/Velocity plugins
-app.post('/api/license/validate', validateLimiter, (req, res) => {
+app.post('/api/license/validate', validateLimiter, async (req, res) => {
   const {
     license_key,
     api_key,
@@ -438,11 +599,11 @@ app.post('/api/license/validate', validateLimiter, (req, res) => {
   const clientIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress || server_ip;
 
   // 1. IP Ban check
-  const bannedIps = loadBannedIps();
+  const bannedIps = await getBannedIpsDB();
   if (bannedIps[clientIp]) {
     const banInfo = bannedIps[clientIp];
     pushConsole('ERROR', 'SECURITY', `🚫 Blocked connection from banned IP ${clientIp} (${banInfo.reason || 'Blacklisted'})`);
-    logValidation({ key: license_key || 'UNKNOWN', valid: false, reason: `IP ${clientIp} is BANNED (${banInfo.reason || 'Blacklisted'})`, ip: clientIp, product });
+    logValidation({ key: license_key || 'UNKNOWN', valid: false, reason: `IP ${clientIp} is BANNED (${banInfo.reason || 'Blacklisted'})`, ip: clientIp, product }).catch(() => {});
     return res.status(403).json({
       valid: false,
       status: 'IP_BANNED',
@@ -454,7 +615,7 @@ app.post('/api/license/validate', validateLimiter, (req, res) => {
   const providedApiKey = req.headers['x-api-key'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '').trim() || api_key;
   if (!isValidApiKey(providedApiKey)) {
     pushConsole('WARN', 'SECURITY', `⚠️ Unauthorized API key attempt from ${clientIp} (Product: ${product || 'unknown'})`);
-    logValidation({ key: license_key || 'UNKNOWN', valid: false, reason: 'Invalid or missing API key', ip: clientIp, product });
+    logValidation({ key: license_key || 'UNKNOWN', valid: false, reason: 'Invalid or missing API key', ip: clientIp, product }).catch(() => {});
     return res.status(401).json({
       valid: false,
       status: 'UNAUTHORIZED_API_KEY',
@@ -468,12 +629,11 @@ app.post('/api/license/validate', validateLimiter, (req, res) => {
     effectiveKey = 'RS-DEFAULT-PREMIUM-KEY-2026';
   }
 
-  const licenses = loadLicenses();
-  const license = licenses[effectiveKey];
+  const license = await getLicense(effectiveKey);
 
   if (!license) {
     pushConsole('WARN', 'LICENSE', `🔴 Key not found in database: "${effectiveKey}" from ${clientIp}`);
-    logValidation({ key: effectiveKey, valid: false, reason: 'Key not found', ip: clientIp, product });
+    logValidation({ key: effectiveKey, valid: false, reason: 'Key not found', ip: clientIp, product }).catch(() => {});
     return res.status(200).json({
       valid: false,
       status: 'INVALID',
@@ -488,8 +648,7 @@ app.post('/api/license/validate', validateLimiter, (req, res) => {
       license.servers[serverId].status = 'OFFLINE';
       license.servers[serverId].last_seen = new Date().toISOString();
       license.servers[serverId].online_players = 0;
-      licenses[effectiveKey] = license;
-      saveLicenses(licenses);
+      await saveLicenseDB(license);
     }
     pushConsole('INFO', 'LICENSE', `⚪ Server ${serverId} (${product || 'plugin'}) disconnected [OFFLINE]`);
     return res.status(200).json({
@@ -501,7 +660,7 @@ app.post('/api/license/validate', validateLimiter, (req, res) => {
 
   if (license.status !== 'ACTIVE') {
     pushConsole('WARN', 'LICENSE', `🔴 Denied ${clientIp}: key ${license.key} status is ${license.status}`);
-    logValidation({ key: effectiveKey, valid: false, reason: `Status: ${license.status}`, ip: clientIp, product });
+    logValidation({ key: effectiveKey, valid: false, reason: `Status: ${license.status}`, ip: clientIp, product }).catch(() => {});
     return res.status(200).json({
       valid: false,
       status: license.status,
@@ -511,7 +670,7 @@ app.post('/api/license/validate', validateLimiter, (req, res) => {
 
   if (license.expires_at && new Date() > new Date(license.expires_at)) {
     pushConsole('WARN', 'LICENSE', `🔴 Denied ${clientIp}: key ${license.key} expired on ${license.expires_at}`);
-    logValidation({ key: effectiveKey, valid: false, reason: 'License expired', ip: clientIp, product });
+    logValidation({ key: effectiveKey, valid: false, reason: 'License expired', ip: clientIp, product }).catch(() => {});
     return res.status(200).json({
       valid: false,
       status: 'EXPIRED',
@@ -523,12 +682,11 @@ app.post('/api/license/validate', validateLimiter, (req, res) => {
   if (license.ip_lock) {
     if (!license.bound_ip && clientIp) {
       license.bound_ip = clientIp;
-      licenses[effectiveKey] = license;
-      saveLicenses(licenses);
+      await saveLicenseDB(license);
       pushConsole('INFO', 'LICENSE', `🔒 Key ${license.key} automatically bound to first IP: ${clientIp}`);
     } else if (license.bound_ip && license.bound_ip !== clientIp && license.bound_ip !== server_ip) {
       pushConsole('WARN', 'SECURITY', `🚫 IP mismatch for ${license.key}: bound=${license.bound_ip}, caller=${clientIp}`);
-      logValidation({ key: effectiveKey, valid: false, reason: `IP mismatch (bound: ${license.bound_ip}, got: ${clientIp})`, ip: clientIp, product });
+      logValidation({ key: effectiveKey, valid: false, reason: `IP mismatch (bound: ${license.bound_ip}, got: ${clientIp})`, ip: clientIp, product }).catch(() => {});
       return res.status(200).json({
         valid: false,
         status: 'IP_MISMATCH',
@@ -542,7 +700,7 @@ app.post('/api/license/validate', validateLimiter, (req, res) => {
   const existingServers = Object.keys(license.servers);
   if (typeof license.max_servers === 'number' && license.max_servers > 0 && !license.servers[serverId] && existingServers.length >= license.max_servers) {
     pushConsole('WARN', 'LICENSE', `⚠️ Server limit exceeded for ${license.key}: ${existingServers.length}/${license.max_servers}`);
-    logValidation({ key: effectiveKey, valid: false, reason: `Max server limit reached (${existingServers.length}/${license.max_servers})`, ip: clientIp, product });
+    logValidation({ key: effectiveKey, valid: false, reason: `Max server limit reached (${existingServers.length}/${license.max_servers})`, ip: clientIp, product }).catch(() => {});
     return res.status(200).json({
       valid: false,
       status: 'SERVER_LIMIT_REACHED',
@@ -570,14 +728,13 @@ app.post('/api/license/validate', validateLimiter, (req, res) => {
     first_seen: license.servers[serverId]?.first_seen || new Date().toISOString(),
     last_seen: new Date().toISOString()
   };
-  licenses[effectiveKey] = license;
-  saveLicenses(licenses);
+  await saveLicenseDB(license);
 
   const timestamp = Math.floor(Date.now() / 1000);
   const signature = generateSignature(license.key, license.status, timestamp);
 
   pushConsole('SUCCESS', 'LICENSE', `🟢 Server "${nodeName}" [${serverId}] (${product || 'rslogin'}, ${playersCount}/${maxCap} players) verified key ${license.key} [${license.owner}]`);
-  logValidation({ key: effectiveKey, valid: true, owner: license.owner, ip: clientIp, port: port || 25565, server_name: nodeName, product });
+  logValidation({ key: effectiveKey, valid: true, owner: license.owner, ip: clientIp, port: port || 25565, server_name: nodeName, product }).catch(() => {});
 
   return res.status(200).json({
     valid: true,
@@ -685,7 +842,7 @@ app.post('/api/admin/logout', requireAdmin, (req, res) => {
 // ---------------------- Interactive Console & Terminal CLI ----------------------
 
 // Execute terminal command
-app.post('/api/admin/console/exec', requireAdmin, (req, res) => {
+app.post('/api/admin/console/exec', requireAdmin, async (req, res) => {
   const rawCommand = (req.body.command || '').trim();
   if (!rawCommand) {
     return res.status(400).json({ error: 'Command cannot be empty' });
@@ -696,9 +853,6 @@ app.post('/api/admin/console/exec', requireAdmin, (req, res) => {
   const parts = rawCommand.split(/\s+/);
   const cmd = parts[0].toLowerCase();
   const args = parts.slice(1);
-
-  const licenses = loadLicenses();
-  const banned = loadBannedIps();
 
   let output = '';
 
@@ -727,7 +881,9 @@ app.post('/api/admin/console/exec', requireAdmin, (req, res) => {
       break;
 
     case 'status':
-    case 'stats':
+    case 'stats': {
+      const licenses = await getAllLicenses();
+      const banned = await getBannedIpsDB();
       const mem = process.memoryUsage();
       const uptimeSec = Math.floor(process.uptime());
       const hours = Math.floor(uptimeSec / 3600);
@@ -748,9 +904,11 @@ app.post('/api/admin/console/exec', requireAdmin, (req, res) => {
       ].join('\n');
       pushConsole('SUCCESS', 'CLI', output);
       break;
+    }
 
     case 'keys':
-    case 'list':
+    case 'list': {
+      const licenses = await getAllLicenses();
       const keyList = Object.values(licenses);
       if (keyList.length === 0) {
         output = 'No license keys found in database.';
@@ -762,15 +920,15 @@ app.post('/api/admin/console/exec', requireAdmin, (req, res) => {
       }
       pushConsole('INFO', 'CLI', output);
       break;
+    }
 
     case 'gen':
-    case 'create':
+    case 'create': {
       const owner = args[0] || 'Customer';
       const tier = (args[1] || 'PREMIUM').toUpperCase();
       const max_servers = parseInt(args[2]) || 3;
       const newKey = generateKeyString();
-
-      licenses[newKey] = {
+      const newLic = {
         key: newKey,
         owner,
         tier,
@@ -783,53 +941,59 @@ app.post('/api/admin/console/exec', requireAdmin, (req, res) => {
         note: 'Generated from Console CLI',
         servers: {}
       };
-      saveLicenses(licenses);
-
+      await saveLicenseDB(newLic);
       output = `✓ License generated: ${newKey} for ${owner} [Tier: ${tier}, Max Servers: ${max_servers}]`;
       pushConsole('SUCCESS', 'CLI', output);
       break;
+    }
 
-    case 'activate':
+    case 'activate': {
       const actKey = args[0];
-      if (!actKey || !licenses[actKey]) {
+      const actLic = actKey ? await getLicense(actKey) : null;
+      if (!actLic) {
         output = `Error: License key "${actKey}" not found.`;
         pushConsole('ERROR', 'CLI', output);
       } else {
-        licenses[actKey].status = 'ACTIVE';
-        saveLicenses(licenses);
+        actLic.status = 'ACTIVE';
+        await saveLicenseDB(actLic);
         output = `✓ License ${actKey} is now ACTIVE.`;
         pushConsole('SUCCESS', 'CLI', output);
       }
       break;
+    }
 
-    case 'suspend':
+    case 'suspend': {
       const suspKey = args[0];
-      if (!suspKey || !licenses[suspKey]) {
+      const suspLic = suspKey ? await getLicense(suspKey) : null;
+      if (!suspLic) {
         output = `Error: License key "${suspKey}" not found.`;
         pushConsole('ERROR', 'CLI', output);
       } else {
-        licenses[suspKey].status = 'SUSPENDED';
-        saveLicenses(licenses);
+        suspLic.status = 'SUSPENDED';
+        await saveLicenseDB(suspLic);
         output = `✓ License ${suspKey} is now SUSPENDED.`;
         pushConsole('WARN', 'CLI', output);
       }
       break;
+    }
 
     case 'delete':
-    case 'remove':
+    case 'remove': {
       const delKey = args[0];
-      if (!delKey || !licenses[delKey]) {
+      const delLic = delKey ? await getLicense(delKey) : null;
+      if (!delLic) {
         output = `Error: License key "${delKey}" not found.`;
         pushConsole('ERROR', 'CLI', output);
       } else {
-        delete licenses[delKey];
-        saveLicenses(licenses);
+        await deleteLicenseDB(delKey);
         output = `✓ License ${delKey} has been permanently deleted.`;
         pushConsole('WARN', 'CLI', output);
       }
       break;
+    }
 
-    case 'servers':
+    case 'servers': {
+      const licenses = await getAllLicenses();
       const srvList = [];
       Object.values(licenses).forEach(k => {
         if (k.servers) {
@@ -841,72 +1005,76 @@ app.post('/api/admin/console/exec', requireAdmin, (req, res) => {
       output = srvList.length > 0 ? srvList.join('\n') : 'No Minecraft server nodes currently connected.';
       pushConsole('INFO', 'CLI', output);
       break;
+    }
 
-    case 'kick':
+    case 'kick': {
       const kKey = args[0];
       const kServerId = args[1];
-      if (!kKey || !kServerId || !licenses[kKey] || !licenses[kKey].servers?.[kServerId]) {
+      const kLic = kKey ? await getLicense(kKey) : null;
+      if (!kLic || !kServerId || !kLic.servers?.[kServerId]) {
         output = `Error: Invalid syntax or server not found. Usage: kick <license_key> <ip:port>`;
         pushConsole('ERROR', 'CLI', output);
       } else {
-        delete licenses[kKey].servers[kServerId];
-        saveLicenses(licenses);
+        delete kLic.servers[kServerId];
+        await saveLicenseDB(kLic);
         output = `✓ Server ${kServerId} disconnected from key ${kKey}.`;
         pushConsole('SUCCESS', 'CLI', output);
       }
       break;
+    }
 
-    case 'reset-ip':
+    case 'reset-ip': {
       const rKey = args[0];
-      if (!rKey || !licenses[rKey]) {
+      const rLic = rKey ? await getLicense(rKey) : null;
+      if (!rLic) {
         output = `Error: License key "${rKey}" not found.`;
         pushConsole('ERROR', 'CLI', output);
       } else {
-        licenses[rKey].bound_ip = null;
-        saveLicenses(licenses);
+        rLic.bound_ip = null;
+        await saveLicenseDB(rLic);
         output = `✓ Bound IP cleared for ${rKey}. Next connection will re-bind.`;
         pushConsole('SUCCESS', 'CLI', output);
       }
       break;
+    }
 
-    case 'ban':
+    case 'ban': {
       const banIp = args[0];
       const banReason = args.slice(1).join(' ') || 'Banned via Console CLI';
       if (!banIp) {
         output = 'Error: IP address is required. Usage: ban <ip> [reason]';
         pushConsole('ERROR', 'CLI', output);
       } else {
-        banned[banIp.trim()] = {
-          ip: banIp.trim(),
-          reason: banReason,
-          banned_at: new Date().toISOString()
-        };
-        saveBannedIps(banned);
+        await banIpDB(banIp.trim(), banReason);
         output = `⛔ IP ${banIp.trim()} has been blacklisted. Reason: ${banReason}`;
         pushConsole('ERROR', 'CLI', output);
       }
       break;
+    }
 
-    case 'unban':
+    case 'unban': {
       const unbanIp = args[0];
+      const banned = await getBannedIpsDB();
       if (!unbanIp || !banned[unbanIp.trim()]) {
         output = `Error: IP "${unbanIp}" not found in blacklist.`;
         pushConsole('ERROR', 'CLI', output);
       } else {
-        delete banned[unbanIp.trim()];
-        saveBannedIps(banned);
+        await unbanIpDB(unbanIp.trim());
         output = `✓ IP ${unbanIp.trim()} has been unbanned.`;
         pushConsole('SUCCESS', 'CLI', output);
       }
       break;
+    }
 
-    case 'banned':
+    case 'banned': {
+      const banned = await getBannedIpsDB();
       const bList = Object.values(banned);
       output = bList.length > 0
         ? bList.map(b => `• ${b.ip} | Reason: ${b.reason || '—'} | Date: ${new Date(b.banned_at).toLocaleString()}`).join('\n')
         : 'No IP addresses are currently blacklisted.';
       pushConsole('INFO', 'CLI', output);
       break;
+    }
 
     case 'clear':
       consoleLogs.length = 0;
@@ -980,8 +1148,8 @@ app.delete('/api/admin/console/logs', requireAdmin, (req, res) => {
 // ---------------------- Admin License Management ----------------------
 
 // List all licenses
-app.get('/api/admin/licenses', requireAdmin, (req, res) => {
-  const licenses = loadLicenses();
+app.get('/api/admin/licenses', requireAdmin, async (req, res) => {
+  const licenses = await getAllLicenses();
   const now = Date.now();
   for (const lic of Object.values(licenses)) {
     if (lic.servers) {
@@ -1005,15 +1173,15 @@ app.get('/api/admin/licenses', requireAdmin, (req, res) => {
 });
 
 // Create custom license
-app.post('/api/admin/licenses', requireAdmin, (req, res) => {
+app.post('/api/admin/licenses', requireAdmin, async (req, res) => {
   let { key, owner = 'Customer', tier = 'STANDARD', max_servers = 3, ip_lock = false, bound_ip = null, expires_at = null, note = '' } = req.body || {};
   if (!key || typeof key !== 'string' || !/^[A-Za-z0-9\-_]{3,64}$/.test(key.trim())) {
     return res.status(400).json({ error: 'License key must be 3-64 alphanumeric characters, dashes, or underscores' });
   }
 
   const cleanKey = key.trim();
-  const licenses = loadLicenses();
-  if (licenses[cleanKey]) {
+  const existing = await getLicense(cleanKey);
+  if (existing) {
     return res.status(409).json({ error: 'License key already exists' });
   }
 
@@ -1023,7 +1191,7 @@ app.post('/api/admin/licenses', requireAdmin, (req, res) => {
     cleanMaxServers = (num > 0) ? num : null;
   }
 
-  licenses[cleanKey] = {
+  const newLic = {
     key: cleanKey,
     owner: String(owner || 'Customer').trim().slice(0, 100),
     tier: String(tier || 'STANDARD').trim().toUpperCase().slice(0, 30),
@@ -1037,21 +1205,21 @@ app.post('/api/admin/licenses', requireAdmin, (req, res) => {
     servers: {}
   };
 
-  saveLicenses(licenses);
-  pushConsole('SUCCESS', 'ADMIN', `✨ New license created: ${cleanKey} for ${licenses[cleanKey].owner} [Tier: ${licenses[cleanKey].tier}, Max: ${licenses[cleanKey].max_servers}]`);
+  await saveLicenseDB(newLic);
+  pushConsole('SUCCESS', 'ADMIN', `✨ New license created: ${cleanKey} for ${newLic.owner} [Tier: ${newLic.tier}, Max: ${newLic.max_servers}]`);
   res.status(201).json({
     success: true,
     message: 'License created successfully',
-    license: licenses[cleanKey]
+    license: newLic
   });
 });
 
 // Update license info (supports renaming key and editing all properties)
-function handleUpdateLicense(req, res) {
-  const licenses = loadLicenses();
+async function handleUpdateLicense(req, res) {
   const key = req.params.key;
+  const license = await getLicense(key);
 
-  if (!licenses[key]) {
+  if (!license) {
     return res.status(404).json({ error: 'License not found' });
   }
 
@@ -1065,40 +1233,41 @@ function handleUpdateLicense(req, res) {
     if (!/^[A-Za-z0-9\-_]{3,64}$/.test(cleanNewKey)) {
       return res.status(400).json({ error: 'New license key must be 3-64 alphanumeric characters, dashes, or underscores' });
     }
-    if (licenses[cleanNewKey]) {
+    const conflict = await getLicense(cleanNewKey);
+    if (conflict) {
       return res.status(409).json({ error: `License key "${cleanNewKey}" already exists` });
     }
-    licenses[cleanNewKey] = licenses[key];
-    delete licenses[key];
-    licenses[cleanNewKey].key = cleanNewKey;
+    // Delete old key, will re-insert with new key below
+    await deleteLicenseDB(key);
+    license.key = cleanNewKey;
     targetKey = cleanNewKey;
     pushConsole('WARN', 'ADMIN', `🔑 License key renamed: "${key}" ➔ "${cleanNewKey}"`);
   }
 
-  if (status) licenses[targetKey].status = status;
-  if (owner !== undefined) licenses[targetKey].owner = String(owner || '').trim().slice(0, 100);
-  if (tier !== undefined) licenses[targetKey].tier = String(tier || 'STANDARD').trim().toUpperCase().slice(0, 30);
+  if (status) license.status = status;
+  if (owner !== undefined) license.owner = String(owner || '').trim().slice(0, 100);
+  if (tier !== undefined) license.tier = String(tier || 'STANDARD').trim().toUpperCase().slice(0, 30);
   if (max_servers !== undefined) {
     if (max_servers === null || max_servers === 0 || max_servers === '0' || max_servers === '' || String(max_servers).toLowerCase() === 'unlimited') {
-      licenses[targetKey].max_servers = null; // Unlimited
+      license.max_servers = null;
     } else {
       const num = parseInt(max_servers, 10);
-      licenses[targetKey].max_servers = (num > 0) ? num : null;
+      license.max_servers = (num > 0) ? num : null;
     }
   }
-  if (ip_lock !== undefined) licenses[targetKey].ip_lock = Boolean(ip_lock);
-  if (bound_ip !== undefined) licenses[targetKey].bound_ip = bound_ip ? String(bound_ip).trim().slice(0, 60) : null;
-  if (expires_at !== undefined) licenses[targetKey].expires_at = expires_at ? new Date(expires_at).toISOString() : null;
-  if (note !== undefined) licenses[targetKey].note = String(note || '').trim().slice(0, 255);
+  if (ip_lock !== undefined) license.ip_lock = Boolean(ip_lock);
+  if (bound_ip !== undefined) license.bound_ip = bound_ip ? String(bound_ip).trim().slice(0, 60) : null;
+  if (expires_at !== undefined) license.expires_at = expires_at ? new Date(expires_at).toISOString() : null;
+  if (note !== undefined) license.note = String(note || '').trim().slice(0, 255);
 
-  licenses[targetKey].updated_at = new Date().toISOString();
-  saveLicenses(licenses);
+  license.updated_at = new Date().toISOString();
+  await saveLicenseDB(license);
 
-  pushConsole('INFO', 'ADMIN', `✏️ License ${targetKey} updated (Owner: ${licenses[targetKey].owner}, Tier: ${licenses[targetKey].tier}, Status: ${licenses[targetKey].status})`);
+  pushConsole('INFO', 'ADMIN', `✏️ License ${targetKey} updated (Owner: ${license.owner}, Tier: ${license.tier}, Status: ${license.status})`);
   res.json({
     success: true,
     message: 'License updated successfully',
-    license: licenses[targetKey]
+    license
   });
 }
 
@@ -1106,16 +1275,16 @@ app.put('/api/admin/licenses/:key', requireAdmin, handleUpdateLicense);
 app.patch('/api/admin/licenses/:key', requireAdmin, handleUpdateLicense);
 
 // Reset IP lock on a key
-app.post('/api/admin/licenses/:key/reset-ip', requireAdmin, (req, res) => {
-  const licenses = loadLicenses();
+app.post('/api/admin/licenses/:key/reset-ip', requireAdmin, async (req, res) => {
   const key = req.params.key;
+  const license = await getLicense(key);
 
-  if (!licenses[key]) {
+  if (!license) {
     return res.status(404).json({ error: 'License not found' });
   }
 
-  licenses[key].bound_ip = null;
-  saveLicenses(licenses);
+  license.bound_ip = null;
+  await saveLicenseDB(license);
   pushConsole('INFO', 'ADMIN', `🔓 IP lock reset for key ${key}`);
 
   res.json({
@@ -1125,17 +1294,17 @@ app.post('/api/admin/licenses/:key/reset-ip', requireAdmin, (req, res) => {
 });
 
 // Remove a connected server from a license key
-app.delete('/api/admin/licenses/:key/servers/:serverId', requireAdmin, (req, res) => {
-  const licenses = loadLicenses();
+app.delete('/api/admin/licenses/:key/servers/:serverId', requireAdmin, async (req, res) => {
   const { key, serverId } = req.params;
+  const license = await getLicense(key);
 
-  if (!licenses[key]) {
+  if (!license) {
     return res.status(404).json({ error: 'License not found' });
   }
 
-  if (licenses[key].servers && licenses[key].servers[serverId]) {
-    delete licenses[key].servers[serverId];
-    saveLicenses(licenses);
+  if (license.servers && license.servers[serverId]) {
+    delete license.servers[serverId];
+    await saveLicenseDB(license);
     pushConsole('WARN', 'ADMIN', `🔌 Disconnected server node ${serverId} from key ${key}`);
     return res.json({
       success: true,
@@ -1147,16 +1316,15 @@ app.delete('/api/admin/licenses/:key/servers/:serverId', requireAdmin, (req, res
 });
 
 // Delete license permanently
-app.delete('/api/admin/licenses/:key', requireAdmin, (req, res) => {
-  const licenses = loadLicenses();
+app.delete('/api/admin/licenses/:key', requireAdmin, async (req, res) => {
   const key = req.params.key;
+  const license = await getLicense(key);
 
-  if (!licenses[key]) {
+  if (!license) {
     return res.status(404).json({ error: 'License not found' });
   }
 
-  delete licenses[key];
-  saveLicenses(licenses);
+  await deleteLicenseDB(key);
   pushConsole('WARN', 'ADMIN', `🗑️ Permanently deleted license ${key}`);
 
   res.json({
@@ -1168,8 +1336,8 @@ app.delete('/api/admin/licenses/:key', requireAdmin, (req, res) => {
 // ---------------------- Banned IPs Management ----------------------
 
 // List all banned IPs
-app.get('/api/admin/banned-ips', requireAdmin, (req, res) => {
-  const banned = loadBannedIps();
+app.get('/api/admin/banned-ips', requireAdmin, async (req, res) => {
+  const banned = await getBannedIpsDB();
   res.json({
     count: Object.keys(banned).length,
     banned_ips: Object.values(banned)
@@ -1177,40 +1345,32 @@ app.get('/api/admin/banned-ips', requireAdmin, (req, res) => {
 });
 
 // Ban an IP
-app.post('/api/admin/banned-ips', requireAdmin, (req, res) => {
+app.post('/api/admin/banned-ips', requireAdmin, async (req, res) => {
   const { ip, reason = 'Administrative ban' } = req.body;
   if (!ip) {
     return res.status(400).json({ error: 'IP address is required' });
   }
 
-  const banned = loadBannedIps();
   const cleanIp = ip.trim();
-  banned[cleanIp] = {
-    ip: cleanIp,
-    reason: reason.trim(),
-    banned_at: new Date().toISOString()
-  };
-
-  saveBannedIps(banned);
+  await banIpDB(cleanIp, reason.trim());
   pushConsole('ERROR', 'SECURITY', `⛔ Admin blacklisted IP ${cleanIp} (Reason: ${reason})`);
   res.status(201).json({
     success: true,
     message: `IP ${cleanIp} has been banned.`,
-    entry: banned[cleanIp]
+    entry: { ip: cleanIp, reason: reason.trim(), banned_at: new Date().toISOString() }
   });
 });
 
 // Unban an IP
-app.delete('/api/admin/banned-ips/:ip', requireAdmin, (req, res) => {
+app.delete('/api/admin/banned-ips/:ip', requireAdmin, async (req, res) => {
   const cleanIp = req.params.ip.trim();
-  const banned = loadBannedIps();
+  const banned = await getBannedIpsDB();
 
   if (!banned[cleanIp]) {
     return res.status(404).json({ error: 'IP not found in ban list' });
   }
 
-  delete banned[cleanIp];
-  saveBannedIps(banned);
+  await unbanIpDB(cleanIp);
   pushConsole('INFO', 'SECURITY', `🟢 Admin unbanned IP ${cleanIp}`);
 
   res.json({
@@ -1221,47 +1381,20 @@ app.delete('/api/admin/banned-ips/:ip', requireAdmin, (req, res) => {
 
 // ---------------------- Audit Logs Management ----------------------
 
-function collapseLogs(rawLogs) {
-  if (!Array.isArray(rawLogs) || rawLogs.length === 0) return [];
-  const map = new Map();
-  for (const item of rawLogs) {
-    const key = (item.key || 'UNKNOWN').trim();
-    const ip = (item.ip || '127.0.0.1').trim();
-    const serverId = `${key}@${ip}`;
-    if (!map.has(serverId)) {
-      map.set(serverId, { ...item, key, ip, count: item.count || 1 });
-    } else {
-      const existing = map.get(serverId);
-      existing.count = (existing.count || 1) + (item.count || 1);
-      if (!existing.timestamp || new Date(item.timestamp) > new Date(existing.timestamp)) {
-        existing.timestamp = item.timestamp;
-        existing.valid = item.valid;
-        if (item.reason) existing.reason = item.reason;
-        if (item.server_name) existing.server_name = item.server_name;
-        if (item.port) existing.port = item.port;
-      }
-    }
-  }
-  return Array.from(map.values()).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-}
-
 // View validation logs
-app.get('/api/admin/logs', requireAdmin, (req, res) => {
+app.get('/api/admin/logs', requireAdmin, async (req, res) => {
   try {
-    let logs = [];
-    if (fs.existsSync(LOGS_FILE)) {
-      logs = JSON.parse(fs.readFileSync(LOGS_FILE, 'utf8'));
-    }
-    res.json({ logs: collapseLogs(logs) });
+    const logs = await getValidationLogsDB();
+    res.json({ logs });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // Clear validation logs
-app.delete('/api/admin/logs', requireAdmin, (req, res) => {
+app.delete('/api/admin/logs', requireAdmin, async (req, res) => {
   try {
-    fs.writeFileSync(LOGS_FILE, JSON.stringify([], null, 2), 'utf8');
+    await clearValidationLogsDB();
     pushConsole('INFO', 'ADMIN', `🧹 Validation audit logs cleared by admin.`);
     res.json({ success: true, message: 'Audit logs cleared successfully.' });
   } catch (err) {
@@ -1270,18 +1403,15 @@ app.delete('/api/admin/logs', requireAdmin, (req, res) => {
 });
 
 // ---------------------- Start Server ----------------------
-try {
-  if (fs.existsSync(LOGS_FILE)) {
-    const raw = JSON.parse(fs.readFileSync(LOGS_FILE, 'utf8'));
-    const sanitized = collapseLogs(raw);
-    fs.writeFileSync(LOGS_FILE, JSON.stringify(sanitized, null, 2), 'utf8');
-  }
-} catch (e) {}
-
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`===============================================`);
-  console.log(`🚀 RSLogin License Server online on port ${PORT}`);
-  console.log(`📡 Health Check: http://localhost:${PORT}/health`);
-  console.log(`🔑 Admin Auth: PROTECTED`);
-  console.log(`===============================================`);
+initDB().then(() => {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`===============================================`);
+    console.log(`🚀 RSLogin License Server online on port ${PORT}`);
+    console.log(`📡 Health Check: http://localhost:${PORT}/health`);
+    console.log(`🔑 Admin Auth: PROTECTED`);
+    console.log(`===============================================`);
+  });
+}).catch((err) => {
+  console.error('Fatal initialization error:', err);
+  process.exit(1);
 });
