@@ -500,28 +500,52 @@ async function logValidation(entry) {
   try {
     const targetKey = (entry.key || 'UNKNOWN').trim();
     const targetIp = (entry.ip || '').trim();
-    await pool.query(`
-      INSERT INTO validation_logs (license_key, valid, ip, port, server_name, product, reason, owner, count, last_seen)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, NOW())
-      ON CONFLICT (license_key, ip) DO UPDATE SET
-        valid = EXCLUDED.valid,
-        port = COALESCE(EXCLUDED.port, validation_logs.port),
-        server_name = COALESCE(EXCLUDED.server_name, validation_logs.server_name),
-        product = COALESCE(EXCLUDED.product, validation_logs.product),
-        reason = EXCLUDED.reason,
-        owner = COALESCE(EXCLUDED.owner, validation_logs.owner),
-        count = validation_logs.count + 1,
-        last_seen = NOW()
-    `, [
-      targetKey,
-      entry.valid,
-      targetIp,
-      entry.port || null,
-      entry.server_name || null,
-      entry.product || null,
-      entry.reason || null,
-      entry.owner || null
-    ]);
+    const targetPort = entry.port ? parseInt(entry.port, 10) : 25565;
+
+    // Check if a record already exists for this same IP and same Port
+    const { rows } = await pool.query(
+      'SELECT id, count FROM validation_logs WHERE ip = $1 AND COALESCE(port, 25565) = $2 LIMIT 1',
+      [targetIp, targetPort]
+    );
+
+    if (rows.length > 0) {
+      // Update existing record: increment count and update latest activity
+      await pool.query(`
+        UPDATE validation_logs SET
+          license_key = $1,
+          valid = $2,
+          server_name = COALESCE($3, server_name),
+          product = COALESCE($4, product),
+          reason = $5,
+          owner = COALESCE($6, owner),
+          count = count + 1,
+          last_seen = NOW()
+        WHERE id = $7
+      `, [
+        targetKey,
+        entry.valid,
+        entry.server_name || null,
+        entry.product || null,
+        entry.reason || null,
+        entry.owner || null,
+        rows[0].id
+      ]);
+    } else {
+      // Insert new record
+      await pool.query(`
+        INSERT INTO validation_logs (license_key, valid, ip, port, server_name, product, reason, owner, count, last_seen)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, NOW())
+      `, [
+        targetKey,
+        entry.valid,
+        targetIp,
+        targetPort,
+        entry.server_name || null,
+        entry.product || null,
+        entry.reason || null,
+        entry.owner || null
+      ]);
+    }
   } catch (err) {
     // Non-critical: log silently
   }
@@ -532,18 +556,37 @@ async function getValidationLogsDB() {
     const { rows } = await pool.query(
       'SELECT * FROM validation_logs ORDER BY last_seen DESC LIMIT 200'
     );
-    return rows.map(row => ({
-      key: row.license_key,
-      valid: row.valid,
-      ip: row.ip,
-      port: row.port,
-      server_name: row.server_name,
-      product: row.product,
-      reason: row.reason,
-      owner: row.owner,
-      count: row.count,
-      timestamp: row.last_seen ? row.last_seen.toISOString() : null
-    }));
+    // Deduplicate strictly by IP + Port: same IP same port will NEVER be shown again and again
+    const nodeMap = new Map();
+    for (const row of rows) {
+      const nodeKey = `${row.ip || ''}:${row.port || 25565}`;
+      if (!nodeMap.has(nodeKey)) {
+        nodeMap.set(nodeKey, {
+          key: row.license_key,
+          valid: row.valid,
+          ip: row.ip,
+          port: row.port,
+          server_name: row.server_name,
+          product: row.product,
+          reason: row.reason,
+          owner: row.owner,
+          count: row.count || 1,
+          timestamp: row.last_seen ? row.last_seen.toISOString() : null
+        });
+      } else {
+        const existing = nodeMap.get(nodeKey);
+        existing.count = (existing.count || 1) + (row.count || 1);
+        if (!existing.timestamp || (row.last_seen && new Date(row.last_seen) > new Date(existing.timestamp))) {
+          existing.timestamp = row.last_seen ? row.last_seen.toISOString() : null;
+          existing.valid = row.valid;
+          if (row.license_key && row.license_key !== 'UNKNOWN') existing.key = row.license_key;
+          if (row.reason) existing.reason = row.reason;
+          if (row.server_name) existing.server_name = row.server_name;
+          if (row.owner) existing.owner = row.owner;
+        }
+      }
+    }
+    return Array.from(nodeMap.values()).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   } catch (err) {
     console.error('DB getLogs error:', err.message);
     return [];
@@ -603,7 +646,7 @@ app.post('/api/license/validate', validateLimiter, async (req, res) => {
   if (bannedIps[clientIp]) {
     const banInfo = bannedIps[clientIp];
     pushConsole('ERROR', 'SECURITY', `🚫 Blocked connection from banned IP ${clientIp} (${banInfo.reason || 'Blacklisted'})`);
-    logValidation({ key: license_key || 'UNKNOWN', valid: false, reason: `IP ${clientIp} is BANNED (${banInfo.reason || 'Blacklisted'})`, ip: clientIp, product }).catch(() => {});
+    logValidation({ key: license_key || 'UNKNOWN', valid: false, reason: `IP ${clientIp} is BANNED (${banInfo.reason || 'Blacklisted'})`, ip: clientIp, port, product }).catch(() => {});
     return res.status(403).json({
       valid: false,
       status: 'IP_BANNED',
@@ -615,7 +658,7 @@ app.post('/api/license/validate', validateLimiter, async (req, res) => {
   const providedApiKey = req.headers['x-api-key'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '').trim() || api_key;
   if (!isValidApiKey(providedApiKey)) {
     pushConsole('WARN', 'SECURITY', `⚠️ Unauthorized API key attempt from ${clientIp} (Product: ${product || 'unknown'})`);
-    logValidation({ key: license_key || 'UNKNOWN', valid: false, reason: 'Invalid or missing API key', ip: clientIp, product }).catch(() => {});
+    logValidation({ key: license_key || 'UNKNOWN', valid: false, reason: 'Invalid or missing API key', ip: clientIp, port, product }).catch(() => {});
     return res.status(401).json({
       valid: false,
       status: 'UNAUTHORIZED_API_KEY',
@@ -633,7 +676,7 @@ app.post('/api/license/validate', validateLimiter, async (req, res) => {
 
   if (!license) {
     pushConsole('WARN', 'LICENSE', `🔴 Key not found in database: "${effectiveKey}" from ${clientIp}`);
-    logValidation({ key: effectiveKey, valid: false, reason: 'Key not found', ip: clientIp, product }).catch(() => {});
+    logValidation({ key: effectiveKey, valid: false, reason: 'Key not found', ip: clientIp, port, product }).catch(() => {});
     return res.status(200).json({
       valid: false,
       status: 'INVALID',
@@ -660,7 +703,7 @@ app.post('/api/license/validate', validateLimiter, async (req, res) => {
 
   if (license.status !== 'ACTIVE') {
     pushConsole('WARN', 'LICENSE', `🔴 Denied ${clientIp}: key ${license.key} status is ${license.status}`);
-    logValidation({ key: effectiveKey, valid: false, reason: `Status: ${license.status}`, ip: clientIp, product }).catch(() => {});
+    logValidation({ key: effectiveKey, valid: false, reason: `Status: ${license.status}`, ip: clientIp, port, product }).catch(() => {});
     return res.status(200).json({
       valid: false,
       status: license.status,
@@ -670,7 +713,7 @@ app.post('/api/license/validate', validateLimiter, async (req, res) => {
 
   if (license.expires_at && new Date() > new Date(license.expires_at)) {
     pushConsole('WARN', 'LICENSE', `🔴 Denied ${clientIp}: key ${license.key} expired on ${license.expires_at}`);
-    logValidation({ key: effectiveKey, valid: false, reason: 'License expired', ip: clientIp, product }).catch(() => {});
+    logValidation({ key: effectiveKey, valid: false, reason: 'License expired', ip: clientIp, port, product }).catch(() => {});
     return res.status(200).json({
       valid: false,
       status: 'EXPIRED',
@@ -686,7 +729,7 @@ app.post('/api/license/validate', validateLimiter, async (req, res) => {
       pushConsole('INFO', 'LICENSE', `🔒 Key ${license.key} automatically bound to first IP: ${clientIp}`);
     } else if (license.bound_ip && license.bound_ip !== clientIp && license.bound_ip !== server_ip) {
       pushConsole('WARN', 'SECURITY', `🚫 IP mismatch for ${license.key}: bound=${license.bound_ip}, caller=${clientIp}`);
-      logValidation({ key: effectiveKey, valid: false, reason: `IP mismatch (bound: ${license.bound_ip}, got: ${clientIp})`, ip: clientIp, product }).catch(() => {});
+      logValidation({ key: effectiveKey, valid: false, reason: `IP mismatch (bound: ${license.bound_ip}, got: ${clientIp})`, ip: clientIp, port, product }).catch(() => {});
       return res.status(200).json({
         valid: false,
         status: 'IP_MISMATCH',
@@ -697,10 +740,18 @@ app.post('/api/license/validate', validateLimiter, async (req, res) => {
 
   // 5. Server Count Limit check (null or 0 = unlimited)
   if (!license.servers) license.servers = {};
-  const existingServers = Object.keys(license.servers);
-  if (typeof license.max_servers === 'number' && license.max_servers > 0 && !license.servers[serverId] && existingServers.length >= license.max_servers) {
-    pushConsole('WARN', 'LICENSE', `⚠️ Server limit exceeded for ${license.key}: ${existingServers.length}/${license.max_servers}`);
-    logValidation({ key: effectiveKey, valid: false, reason: `Max server limit reached (${existingServers.length}/${license.max_servers})`, ip: clientIp, product }).catch(() => {});
+  const now = Date.now();
+  const activeServerIds = Object.keys(license.servers).filter(sid => {
+    const s = license.servers[sid];
+    if (!s) return false;
+    if (s.status === 'OFFLINE') return false;
+    if (s.last_seen && (now - new Date(s.last_seen).getTime()) > 10 * 60 * 1000) return false;
+    return true;
+  });
+
+  if (typeof license.max_servers === 'number' && license.max_servers > 0 && !license.servers[serverId] && activeServerIds.length >= license.max_servers) {
+    pushConsole('WARN', 'LICENSE', `⚠️ Server limit exceeded for ${license.key}: ${activeServerIds.length}/${license.max_servers}`);
+    logValidation({ key: effectiveKey, valid: false, reason: `Max server limit reached (${activeServerIds.length}/${license.max_servers})`, ip: clientIp, port, product }).catch(() => {});
     return res.status(200).json({
       valid: false,
       status: 'SERVER_LIMIT_REACHED',
@@ -1153,16 +1204,26 @@ app.get('/api/admin/licenses', requireAdmin, async (req, res) => {
   const now = Date.now();
   for (const lic of Object.values(licenses)) {
     if (lic.servers) {
-      for (const srv of Object.values(lic.servers)) {
-        if (srv.status === 'OFFLINE') continue;
-        const diffMs = now - new Date(srv.last_seen).getTime();
-        if (diffMs > 5 * 60 * 1000) {
-          srv.status = 'OFFLINE';
-        } else if (diffMs > 2.5 * 60 * 1000) {
-          srv.status = 'AWAY';
-        } else {
-          srv.status = 'ONLINE';
+      let modified = false;
+      for (const [sid, srv] of Object.entries(lic.servers)) {
+        if (!srv) continue;
+        const diffMs = now - new Date(srv.last_seen || 0).getTime();
+        // Prune inactive server nodes after 15 minutes
+        if (diffMs > 15 * 60 * 1000) {
+          delete lic.servers[sid];
+          modified = true;
+        } else if (srv.status !== 'OFFLINE') {
+          if (diffMs > 5 * 60 * 1000) {
+            srv.status = 'OFFLINE';
+          } else if (diffMs > 2.5 * 60 * 1000) {
+            srv.status = 'AWAY';
+          } else {
+            srv.status = 'ONLINE';
+          }
         }
+      }
+      if (modified) {
+        saveLicenseDB(lic).catch(() => {});
       }
     }
   }
